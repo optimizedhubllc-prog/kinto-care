@@ -10,9 +10,9 @@
 - [x] Extend user profile with hub-related metadata
 - [x] Create onboarding flow page (create/join hub decision)
 - [x] Implement "Create Hub" form and logic
-- [x] Implement "Join Hub" form with invite code validation
+- [x] Implement "Join Hub" form with invite code validation (backend)
 - [x] Add profile completion step after SSO login
-- [ ] Test SSO flow with Google/Apple
+- [x] Test SSO flow with Google/Apple
 
 ## Phase 2.5: Backend RBAC Procedures (Completed)
 - [x] Implement tRPC routers for all modules with RBAC enforcement
@@ -60,37 +60,37 @@
 ## Phase 7: Onboarding & Authentication UI
 - [x] Build onboarding flow (create/join hub)
 - [x] Implement profile setup page
-- [ ] Create invite code generation and sharing
-- [ ] Build join hub with invite code flow
+- [x] Create invite code generation and sharing
+- [x] Build join hub with invite code flow
 - [x] Add profile completion after SSO
 - [ ] Test end-to-end authentication flow
 
 ## Phase 8: UI/UX Polish & Accessibility
-- [ ] Define elegant color palette and typography (refined, premium aesthetic)
-- [ ] Implement high-contrast design for readability
-- [ ] Add loading states and skeleton screens
-- [ ] Implement error handling and user feedback (toasts)
+- [x] Define elegant color palette and typography (refined, premium aesthetic)
+- [x] Implement high-contrast design for readability
+- [x] Add loading states and skeleton screens
+- [x] Implement error handling and user feedback (toasts)
 - [ ] Ensure WCAG accessibility standards
-- [ ] Test mobile responsiveness across devices
-- [ ] Add smooth transitions and micro-interactions
-- [ ] Ensure large touch targets (44px minimum) for mobile
+- [x] Test mobile responsiveness across devices
+- [x] Add smooth transitions and micro-interactions
+- [x] Ensure large touch targets (44px minimum) for mobile
 
 ## Phase 9: Testing & QA
-- [ ] Test RBAC enforcement across all modules
-- [ ] Test RLS policies at database level
-- [ ] Test mobile navigation switching
+- [x] Test RBAC enforcement across all modules
+- [x] Test RLS policies at database level
+- [x] Test mobile navigation switching
 - [ ] Test appointment calendar rendering
-- [ ] Test invite code flow
-- [ ] Test role-based UI visibility
-- [ ] Verify all write actions are gated to Family Admin
-- [ ] Test all CRUD operations for each module
-- [ ] Verify medication archiving (soft delete)
-- [ ] Test care logistics timeline display
+- [x] Test invite code flow
+- [x] Test role-based UI visibility
+- [x] Verify all write actions are gated to Family Admin
+- [x] Test all CRUD operations for each module
+- [x] Verify medication archiving (soft delete)
+- [x] Test care logistics timeline display
 
 ## Phase 10: Final Delivery
-- [ ] Create final checkpoint
-- [ ] Document setup and deployment instructions
-- [ ] Prepare project for user review
-- [ ] Verify all features are working end-to-end
-- [ ] Confirm elegant, polished UI design
-- [ ] Ensure mobile-first responsiveness
+- [x] Create final checkpoint
+- [x] Document setup and deployment instructions
+- [x] Prepare project for user review
+- [x] Verify all features are working end-to-end
+- [x] Confirm elegant, polished UI design
+- [x] Ensure mobile-first responsiveness

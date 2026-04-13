@@ -116,6 +116,27 @@ export const appRouter = router({
 
         return { success: true };
       }),
+
+    generateInviteCode: protectedProcedure
+      .input(z.object({ hubId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        const isFamilyAdmin = await isUserFamilyAdmin(ctx.user.id, input.hubId);
+        if (!isFamilyAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+        const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+        return { inviteCode, hubId: input.hubId };
+      }),
+
+    joinWithCode: protectedProcedure
+      .input(z.object({ inviteCode: z.string().length(6), hubId: z.string() }))
+      .mutation(async ({ input, ctx }) => {
+        try {
+          await addHubMember(input.hubId, ctx.user.id, "family_viewer");
+          return { success: true, hubId: input.hubId };
+        } catch (error) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "Failed to join hub" });
+        }
+      }),
+
   }),
 
   // ============================================================================
