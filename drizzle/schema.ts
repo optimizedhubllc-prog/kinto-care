@@ -1,4 +1,5 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, date, datetime, boolean, uniqueIndex } from "drizzle-orm/mysql-core";
+import { relations } from "drizzle-orm";
 
 /**
  * Core user table backing auth flow.
@@ -25,4 +26,216 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// ============================================================================
+// KINTO: Patient Hub & RBAC Tables
+// ============================================================================
+
+/**
+ * Role enum for hub members.
+ * - family_admin: Full access, can manage members and all data
+ * - family_viewer: Read-only access to all data
+ * - caregiver: Read-only access to all data
+ */
+export const hubMemberRoleEnum = mysqlEnum("hub_member_role", [
+  "family_admin",
+  "family_viewer",
+  "caregiver",
+]);
+
+/**
+ * Patient Hubs: The central entity representing a patient's care ecosystem.
+ * Each hub has a patient name, date of birth, and is created by a Family Admin.
+ */
+export const patientHubs = mysqlTable("patient_hubs", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  patientName: text("patient_name").notNull(),
+  patientDob: date("patient_dob"),
+  createdBy: int("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PatientHub = typeof patientHubs.$inferSelect;
+export type InsertPatientHub = typeof patientHubs.$inferInsert;
+
+/**
+ * Hub Members: Links users to patient hubs with specific roles.
+ * Enforces RBAC via row-level security policies.
+ */
+export const hubMembers = mysqlTable(
+  "hub_members",
+  {
+    id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+    hubId: varchar("hub_id", { length: 36 })
+      .notNull()
+      .references(() => patientHubs.id, { onDelete: "cascade" }),
+    userId: int("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: hubMemberRoleEnum.default("family_viewer").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    uniqueHubUser: uniqueIndex("unique_hub_user").on(table.hubId, table.userId),
+  })
+);
+
+export type HubMember = typeof hubMembers.$inferSelect;
+export type InsertHubMember = typeof hubMembers.$inferInsert;
+
+/**
+ * Medical Contacts: Reference database of doctors and medical professionals.
+ * Managed by Family Admins, viewable by all hub members.
+ */
+export const medicalContacts = mysqlTable("medical_contacts", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  specialty: text("specialty"),
+  phone: varchar("phone", { length: 20 }),
+  email: varchar("email", { length: 320 }),
+  address: text("address"),
+  notes: text("notes"),
+  createdBy: int("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type MedicalContact = typeof medicalContacts.$inferSelect;
+export type InsertMedicalContact = typeof medicalContacts.$inferInsert;
+
+/**
+ * Medications: List of active and inactive medications for the patient.
+ * Add/edit/archive restricted to Family Admins via RLS.
+ */
+export const medications = mysqlTable("medications", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  dosage: text("dosage"),
+  frequency: text("frequency"), // e.g., "Twice daily", "Every 8 hours"
+  instructions: text("instructions"),
+  isActive: boolean("is_active").default(true).notNull(),
+  createdBy: int("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Medication = typeof medications.$inferSelect;
+export type InsertMedication = typeof medications.$inferInsert;
+
+/**
+ * Appointments: Doctor appointments and medical visits.
+ * Can be linked to Medical Contacts. Add/edit/delete restricted to Family Admins via RLS.
+ */
+export const appointments = mysqlTable("appointments", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  medicalContactId: varchar("medical_contact_id", { length: 36 }).references(
+    () => medicalContacts.id,
+    { onDelete: "set null" }
+  ),
+  doctorName: text("doctor_name"), // Fallback if not linked to a contact
+  specialty: text("specialty"),
+  dateTime: datetime("date_time").notNull(),
+  location: text("location"),
+  notes: text("notes"),
+  createdBy: int("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertAppointment = typeof appointments.$inferInsert;
+
+/**
+ * Care Logistics: Shared scheduling log for who is caring for the patient and when.
+ * Includes shift start/end times and handover notes.
+ * Add/edit/delete restricted to Family Admins via RLS.
+ */
+export const careLogistics = mysqlTable("care_logistics", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  caregiverId: int("caregiver_id").references(() => users.id, { onDelete: "set null" }),
+  startTime: datetime("start_time").notNull(),
+  endTime: datetime("end_time").notNull(),
+  taskNotes: text("task_notes"),
+  createdBy: int("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CareLogistic = typeof careLogistics.$inferSelect;
+export type InsertCareLogistic = typeof careLogistics.$inferInsert;
+
+// ============================================================================
+// Relations (for type inference)
+// ============================================================================
+
+export const patientHubsRelations = relations(patientHubs, ({ many, one }) => ({
+  members: many(hubMembers),
+  medications: many(medications),
+  appointments: many(appointments),
+  careLogistics: many(careLogistics),
+  medicalContacts: many(medicalContacts),
+  creator: one(users, {
+    fields: [patientHubs.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const hubMembersRelations = relations(hubMembers, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [hubMembers.hubId],
+    references: [patientHubs.id],
+  }),
+  user: one(users, {
+    fields: [hubMembers.userId],
+    references: [users.id],
+  }),
+}));
+
+export const medicationsRelations = relations(medications, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [medications.hubId],
+    references: [patientHubs.id],
+  }),
+}));
+
+export const appointmentsRelations = relations(appointments, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [appointments.hubId],
+    references: [patientHubs.id],
+  }),
+  medicalContact: one(medicalContacts, {
+    fields: [appointments.medicalContactId],
+    references: [medicalContacts.id],
+  }),
+}));
+
+export const careLogisticsRelations = relations(careLogistics, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [careLogistics.hubId],
+    references: [patientHubs.id],
+  }),
+  caregiver: one(users, {
+    fields: [careLogistics.caregiverId],
+    references: [users.id],
+  }),
+}));
+
+export const medicalContactsRelations = relations(medicalContacts, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [medicalContacts.hubId],
+    references: [patientHubs.id],
+  }),
+}));
