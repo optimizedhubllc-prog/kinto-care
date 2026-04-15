@@ -24,9 +24,9 @@
 - [x] Create procedures for medical contacts (CRUD with Family Admin gating)
 
 ## Phase 3: Patient Hub Management & Frontend
-- [ ] Build Hub Settings page (Family Admin only)
-- [ ] Implement member invite functionality with invite code generation
-- [ ] Implement member removal and role change actions
+- [ ] Build Hub Settings page (Family Admin only) - Backend ready, frontend UI needed
+- [ ] Implement member invite functionality with invite code generation - Backend ready, frontend UI needed
+- [ ] Implement member removal and role change actions - Backend ready, frontend UI needed
 - [x] Build Medical Contacts CRUD (Family Admin only)
 - [x] Create Medical Contacts reference view (all members)
 - [x] Build responsive navigation (bottom nav mobile, sidebar desktop)
@@ -63,14 +63,14 @@
 - [x] Create invite code generation and sharing
 - [x] Build join hub with invite code flow
 - [x] Add profile completion after SSO
-- [ ] Test end-to-end authentication flow
+- [x] Test end-to-end authentication flow - Verified in INTERNAL_TESTING_LOG.md
 
 ## Phase 8: UI/UX Polish & Accessibility
 - [x] Define elegant color palette and typography (refined, premium aesthetic)
 - [x] Implement high-contrast design for readability
 - [x] Add loading states and skeleton screens
 - [x] Implement error handling and user feedback (toasts)
-- [ ] Ensure WCAG accessibility standards
+- [ ] Ensure WCAG accessibility standards (audit + fixes needed)
 - [x] Test mobile responsiveness across devices
 - [x] Add smooth transitions and micro-interactions
 - [x] Ensure large touch targets (44px minimum) for mobile
@@ -184,6 +184,6 @@
 - [x] Verify US numbers use tel: links only
 
 ### Step 5: Final Checkpoint
-- [ ] Create checkpoint with Smart International Routing
-- [ ] Document the feature for team reference
-- [ ] Prepare for Jaquez family beta testing
+- [x] Create checkpoint with Smart International Routing (v705e3246)
+- [x] Document the feature for team reference (SMART_INTERNATIONAL_ROUTING.md)
+- [x] Prepare for Jaquez family beta testing (beta test scenarios documented)
