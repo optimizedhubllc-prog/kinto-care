@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useParams } from "wouter";
+import { useState } from "react";
 import ResponsiveNav from "@/components/ResponsiveNav";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Loader2, Plus, Edit2, Trash2, Phone, Mail, MapPin } from "lucide-react";
+import { Loader2, Plus, Edit2, Trash2, Phone, Mail, MapPin, MessageCircle, Globe, AlertCircle } from "lucide-react";
+import { isInternationalNumber, isDominicanRepublic, getWhatsAppUrl, getCountryName } from "@/lib/phoneUtils";
 
 export default function MedicalContacts() {
   const { user } = useAuth();
@@ -26,11 +27,13 @@ export default function MedicalContacts() {
   });
 
   const contactsQuery = trpc.medicalContacts.list.useQuery({ hubId });
+  const hubQuery = trpc.hubs.getById.useQuery({ hubId });
   const createMutation = trpc.medicalContacts.create.useMutation();
   const updateMutation = trpc.medicalContacts.update.useMutation();
   const deleteMutation = trpc.medicalContacts.delete.useMutation();
 
-  const isFamilyAdmin = user?.role === "admin";
+  const hub = hubQuery.data;
+  const isFamilyAdmin = hub?.members?.some(m => m.userId === user?.id && m.role === 'family_admin');
 
   const handleOpenDialog = (contact?: any) => {
     if (contact) {
@@ -90,7 +93,7 @@ export default function MedicalContacts() {
     }
   };
 
-  if (contactsQuery.isLoading) {
+  if (contactsQuery.isLoading || hubQuery.isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -147,7 +150,7 @@ export default function MedicalContacts() {
                       id="phone"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                      placeholder="e.g., (555) 123-4567"
+                      placeholder="e.g., +1-809-555-1234 or +1-212-555-1234"
                     />
                   </div>
                   <div>
@@ -216,28 +219,78 @@ export default function MedicalContacts() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {contact.phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-slate-600" />
-                        <p className="text-sm">{contact.phone}</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-slate-600" />
+                          {isInternationalNumber(contact.phone) ? (
+                            <p className="text-sm">{contact.phone}</p>
+                          ) : (
+                            <a href={`tel:${contact.phone}`} className="text-sm text-blue-600 hover:underline">
+                              {contact.phone}
+                            </a>
+                          )}
+                        </div>
+                        
+                        {/* International Coordination UI */}
+                        {isInternationalNumber(contact.phone) && (
+                          <div className="ml-6 space-y-2">
+                            {/* Dominican Republic Badge */}
+                            {isDominicanRepublic(contact.phone) && (
+                              <div className="flex items-center gap-2 p-2 bg-amber-50 rounded border border-amber-200">
+                                <Globe className="h-4 w-4 text-amber-600" />
+                                <span className="text-xs text-amber-700 font-medium">Dominican Republic</span>
+                              </div>
+                            )}
+                            
+                            {/* WhatsApp Button */}
+                            <a
+                              href={getWhatsAppUrl(contact.phone)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded hover:bg-green-100 transition-colors text-sm font-medium border border-green-200"
+                            >
+                              <MessageCircle className="h-4 w-4" />
+                              Message via WhatsApp
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
+                    
                     {contact.email && (
                       <div className="flex items-center gap-2">
                         <Mail className="h-4 w-4 text-slate-600" />
-                        <p className="text-sm">{contact.email}</p>
+                        <a href={`mailto:${contact.email}`} className="text-sm text-blue-600 hover:underline">
+                          {contact.email}
+                        </a>
                       </div>
                     )}
+                    
                     {contact.address && (
                       <div className="flex items-center gap-2">
                         <MapPin className="h-4 w-4 text-slate-600" />
                         <p className="text-sm">{contact.address}</p>
                       </div>
                     )}
+                    
                     {contact.notes && (
                       <div className="mt-3 p-3 bg-slate-50 rounded-lg">
                         <p className="text-sm text-slate-600">{contact.notes}</p>
+                      </div>
+                    )}
+                    
+                    {/* International Coordination Info Box */}
+                    {contact.phone && isInternationalNumber(contact.phone) && (
+                      <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                          <div className="text-xs text-blue-700">
+                            <p className="font-medium mb-1">💡 International Coordination</p>
+                            <p>Use WhatsApp to avoid international calling charges. This contact is in {getCountryName(contact.phone) || 'an international location'}.</p>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

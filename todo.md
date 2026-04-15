@@ -151,4 +151,39 @@
 - [x] Implement Confirm & Save workflow
 - [x] Test end-to-end: camera → OCR → form → database save
 - [x] Verify RBAC enforcement (family_admin only)
-- [ ] Create final checkpoint with Seer Engine live
+- [x] Create final checkpoint with Seer Engine live
+
+
+## Phase 13: Smart International Routing (NANP Aware) - IN PROGRESS
+
+### Step 1: Phone Number Validation Utility
+- [x] Create `client/src/lib/phoneUtils.ts` with international detection logic
+- [x] Implement NANP detection (country code +1 with area codes 809, 829, 849 for DR)
+- [x] Add country code detection for non-NANP numbers
+- [x] Create `isInternationalNumber()` function
+- [x] Create `isDominicanRepublic()` function
+- [x] Create `formatWhatsAppLink()` function
+
+### Step 2: Update MedicalContacts UI
+- [x] Read current MedicalContacts.tsx structure
+- [x] Add phone number detection logic to contact card rendering
+- [x] Implement conditional rendering for international vs US numbers
+- [x] Design International Coordination UI with WhatsApp button
+
+### Step 3: WhatsApp Integration
+- [x] Add WhatsApp button with `https://wa.me/[number]` format
+- [x] Ensure phone number is properly formatted (no spaces, dashes)
+- [x] Add fallback tel: link for standard US numbers
+- [x] Style WhatsApp button with green accent (#0D9488 or WhatsApp green)
+
+### Step 4: Testing
+- [x] Test with Dominican Republic numbers (+1-809, +1-829, +1-849)
+- [x] Test with US numbers (+1-2XX, +1-3XX, etc.)
+- [x] Test with other international numbers (+44, +33, +52, etc.)
+- [x] Verify WhatsApp links work correctly
+- [x] Verify US numbers use tel: links only
+
+### Step 5: Final Checkpoint
+- [ ] Create checkpoint with Smart International Routing
+- [ ] Document the feature for team reference
+- [ ] Prepare for Jaquez family beta testing
