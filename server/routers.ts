@@ -31,6 +31,7 @@ import {
   medicalContacts,
 } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import crypto from "crypto";
 
 export const appRouter = router({
   system: systemRouter,
@@ -406,6 +407,83 @@ export const appRouter = router({
         await db.delete(medications).where(eq(medications.id, input.medicationId));
 
         return { success: true };
+      }),
+
+    extractFromImage: protectedProcedure
+      .input(
+        z.object({
+          hubId: z.string(),
+          imageBase64: z.string().min(1, "Image data is required"),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        const isFamilyAdmin = await isUserFamilyAdmin(ctx.user.id, input.hubId);
+        if (!isFamilyAdmin) throw new TRPCError({ code: "FORBIDDEN" });
+
+        try {
+          const { invokeLLM } = await import("./_core/llm");
+
+          const response = await invokeLLM({
+            messages: [
+              {
+                role: "system",
+                content: "You are a medication label OCR assistant. Extract medication information from images. Return ONLY valid JSON with fields: name (string), dosage (string), frequency (string), instructions (string). If any field cannot be determined, use null.",
+              },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: `data:image/jpeg;base64,${input.imageBase64}`,
+                    },
+                  },
+                  {
+                    type: "text",
+                    text: "Extract the medication name, dosage, frequency, and instructions from this label. Return as JSON.",
+                  },
+                ],
+              },
+            ],
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: "medication_extraction",
+                strict: true,
+                schema: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string", description: "Medication name" },
+                    dosage: { type: "string", description: "Dosage amount" },
+                    frequency: { type: "string", description: "Dosing frequency" },
+                    instructions: { type: "string", description: "Special instructions" },
+                  },
+                  required: ["name"],
+                  additionalProperties: false,
+                },
+              },
+            },
+          });
+
+          const content = response.choices?.[0]?.message?.content;
+          if (!content) throw new Error("No response from LLM");
+
+          const contentStr = typeof content === "string" ? content : JSON.stringify(content);
+          const extracted = JSON.parse(contentStr);
+
+          return {
+            name: extracted.name || "",
+            dosage: extracted.dosage || "",
+            frequency: extracted.frequency || "",
+            instructions: extracted.instructions || "",
+          };
+        } catch (error) {
+          console.error("[Seer Engine] OCR Error:", error);
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to extract medication information from image",
+          });
+        }
       }),
   }),
 
