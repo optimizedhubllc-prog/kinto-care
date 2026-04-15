@@ -8,6 +8,15 @@ interface ResponsiveNavProps {
   hubId: string;
 }
 
+/**
+ * KINTO BETA 1.1: Responsive Navigation Component
+ * 
+ * Features:
+ * - Desktop: Warm-toned sidebar with teal primary color
+ * - Mobile: Top hamburger menu + glassmorphism bottom navigation
+ * - Familial Warmth aesthetic with Playfair Display headings
+ * - 32px border-radius on interactive elements
+ */
 export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
@@ -30,11 +39,13 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
 
   return (
     <>
-      {/* Desktop Sidebar */}
-      <div className="hidden md:fixed md:left-0 md:top-0 md:h-screen md:w-64 md:bg-slate-900 md:text-white md:flex md:flex-col md:border-r md:border-slate-800">
-        <div className="p-6 border-b border-slate-800">
-          <h1 className="text-xl font-bold">Kinto</h1>
-          <p className="text-sm text-slate-400 mt-1">Care Hub</p>
+      {/* Desktop Sidebar - Familial Warmth Theme */}
+      <div className="hidden md:fixed md:left-0 md:top-0 md:h-screen md:w-64 md:bg-gradient-to-b md:from-[#FFFBF0] md:to-[#F3E8D8] md:text-slate-900 md:flex md:flex-col md:border-r md:border-[#E5D4C1] md:shadow-lg">
+        <div className="p-6 border-b border-[#E5D4C1]">
+          <h1 className="text-2xl font-bold text-[#0D9488]" style={{ fontFamily: "'Playfair Display', serif" }}>
+            Kinto
+          </h1>
+          <p className="text-sm text-slate-600 mt-1">Care Hub</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
@@ -44,10 +55,10 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
               <button
                 key={item.path}
                 onClick={() => setLocation(item.path)}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] transition-all duration-200 ${
                   isActive(item.path)
-                    ? "bg-blue-600 text-white"
-                    : "text-slate-300 hover:bg-slate-800"
+                    ? "bg-[#0D9488] text-white shadow-md"
+                    : "text-slate-700 hover:bg-[#CCFBF1] hover:text-[#0D9488]"
                 }`}
               >
                 <Icon className="h-5 w-5" />
@@ -57,15 +68,15 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-2">
+        <div className="p-4 border-t border-[#E5D4C1] space-y-2">
           <div className="px-4 py-2">
-            <p className="text-xs text-slate-400">Logged in as</p>
-            <p className="text-sm font-medium truncate">{user?.name}</p>
+            <p className="text-xs text-slate-600">Logged in as</p>
+            <p className="text-sm font-medium truncate text-slate-900">{user?.name}</p>
           </div>
           <Button
             onClick={handleLogout}
             variant="ghost"
-            className="w-full justify-start text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="w-full justify-start text-slate-700 hover:bg-[#CCFBF1] hover:text-[#0D9488] rounded-[2rem]"
           >
             <LogOut className="h-4 w-4 mr-2" />
             Logout
@@ -73,13 +84,15 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
         </div>
       </div>
 
-      {/* Mobile Top Bar */}
-      <div className="md:hidden fixed top-0 left-0 right-0 bg-white border-b border-slate-200 z-50">
+      {/* Mobile Top Bar - Familial Warmth Theme */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-[#FFFBF0] border-b border-[#E5D4C1] z-50 shadow-sm">
         <div className="flex items-center justify-between p-4">
-          <h1 className="text-lg font-bold text-slate-900">Kinto</h1>
+          <h1 className="text-lg font-bold text-[#0D9488]" style={{ fontFamily: "'Playfair Display', serif" }}>
+            Kinto
+          </h1>
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="p-2 hover:bg-slate-100 rounded-lg"
+            className="p-2 hover:bg-[#F3E8D8] rounded-[2rem] text-slate-900 transition-colors"
           >
             {isMobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -91,7 +104,7 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
 
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
-          <div className="border-t border-slate-200 bg-white">
+          <div className="border-t border-[#E5D4C1] bg-[#FFFBF0]">
             <nav className="p-4 space-y-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -102,10 +115,10 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
                       setLocation(item.path);
                       setIsMobileMenuOpen(false);
                     }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] transition-all duration-200 ${
                       isActive(item.path)
-                        ? "bg-blue-50 text-blue-600"
-                        : "text-slate-600 hover:bg-slate-50"
+                        ? "bg-[#0D9488] text-white"
+                        : "text-slate-700 hover:bg-[#CCFBF1]"
                     }`}
                   >
                     <Icon className="h-5 w-5" />
@@ -118,7 +131,7 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
                   handleLogout();
                   setIsMobileMenuOpen(false);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-slate-600 hover:bg-slate-50"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] text-slate-700 hover:bg-[#CCFBF1] transition-colors"
               >
                 <LogOut className="h-5 w-5" />
                 <span className="text-sm font-medium">Logout</span>
@@ -128,8 +141,8 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
         )}
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 z-50">
+      {/* Mobile Bottom Navigation - Glassmorphism Effect */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 glassmorphism border-t border-white/20">
         <div className="flex items-center justify-around">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -137,21 +150,21 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
               <button
                 key={item.path}
                 onClick={() => setLocation(item.path)}
-                className={`flex-1 flex flex-col items-center justify-center py-3 transition-colors ${
+                className={`flex-1 flex flex-col items-center justify-center py-3 transition-all duration-200 ${
                   isActive(item.path)
-                    ? "text-blue-600 border-t-2 border-blue-600"
-                    : "text-slate-600 hover:text-slate-900"
+                    ? "text-[#0D9488] border-t-2 border-[#0D9488]"
+                    : "text-slate-600 hover:text-[#0D9488]"
                 }`}
               >
                 <Icon className="h-6 w-6" />
-                <span className="text-xs mt-1">{item.label}</span>
+                <span className="text-xs mt-1 font-medium">{item.label}</span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Content Padding */}
+      {/* Content Padding - Ensures content doesn't overlap with nav */}
       <div className="md:ml-64 md:pt-0 pt-16 pb-20 md:pb-0" />
     </>
   );

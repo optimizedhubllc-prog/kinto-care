@@ -94,3 +94,49 @@
 - [x] Verify all features are working end-to-end
 - [x] Confirm elegant, polished UI design
 - [x] Ensure mobile-first responsiveness
+
+
+## Phase 11: Kinto Beta 1.1 - Visual Refresh & Seer Engine
+
+### Step 1: Visual Identity Overhaul
+- [x] Update Tailwind theme to Familial Warmth aesthetic
+- [x] Add Inter font for body text
+- [x] Add Playfair Display font for headings
+- [x] Update color palette: Background #FFFBF0, Primary #0D9488, Accent #F87171
+- [x] Apply 32px border-radius to all cards
+- [x] Add glassmorphism effect to mobile bottom navigation
+- [x] Update index.css with new CSS variables and theme
+
+### Step 2: Seer Engine Backend (OCR)
+- [ ] Create medications.extractFromImage tRPC mutation
+- [ ] Integrate Vision LLM for image-to-text extraction
+- [ ] Parse medication name, dosage, frequency from image
+- [ ] Map extracted data to medications table schema
+- [ ] Add input validation for base64 images
+- [ ] Implement error handling for OCR failures
+
+### Step 3: Seer Engine Frontend
+- [ ] Add "Scan Label" button to AddMedicationDialog
+- [ ] Implement camera capture functionality
+- [ ] Send image to extractFromImage endpoint
+- [ ] Auto-populate form fields with extracted data
+- [ ] Show extracted data for user review before confirmation
+
+### Step 4: Trust Pillar & Safety
+- [ ] Add persistent compliance disclaimer on Medication Scan screen
+- [ ] Implement mandatory "Confirm" button before database save
+- [ ] Add visual indicators for scanned vs manually entered data
+- [ ] Ensure manual review workflow is enforced
+
+### Step 5: Testing & Validation
+- [ ] Test OCR extraction accuracy
+- [ ] Test camera functionality on mobile
+- [ ] Verify compliance disclaimer displays correctly
+- [ ] Test manual review and confirmation flow
+- [ ] Verify RBAC still enforced with Seer Engine
+
+### Step 6: Final Checkpoint
+- [ ] Create checkpoint for Beta 1.1
+- [ ] Verify all visual changes applied globally
+- [ ] Confirm Seer Engine working end-to-end
+- [ ] Document new Seer Engine API
