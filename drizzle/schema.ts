@@ -1,5 +1,6 @@
 import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, date, datetime, boolean, uniqueIndex } from "drizzle-orm/mysql-core";
 import { relations } from "drizzle-orm";
+import crypto from "crypto";
 
 /**
  * Core user table backing auth flow.
@@ -237,5 +238,67 @@ export const medicalContactsRelations = relations(medicalContacts, ({ one }) => 
   hub: one(patientHubs, {
     fields: [medicalContacts.hubId],
     references: [patientHubs.id],
+  }),
+}));
+
+// ============================================================================
+// KINTO: Webhook Integration (n8n)
+// ============================================================================
+
+/**
+ * Webhook Events: Stores incoming webhook payloads from n8n.
+ * Used for audit trail and event history.
+ */
+export const webhookEvents = mysqlTable("webhook_events", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  payload: text("payload"),
+  status: mysqlEnum("status", ["pending", "delivered", "failed"]).default("pending").notNull(),
+  deliveredAt: timestamp("delivered_at"),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+export type InsertWebhookEvent = typeof webhookEvents.$inferInsert;
+
+/**
+ * Webhook Logs: Audit trail for all webhook requests.
+ * Tracks request/response details for debugging and compliance.
+ */
+export const webhookLogs = mysqlTable("webhook_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  webhookEventId: varchar("webhook_event_id", { length: 36 })
+    .notNull()
+    .references(() => webhookEvents.id, { onDelete: "cascade" }),
+  statusCode: int("status_code").notNull(),
+  responseMessage: text("response_message"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type WebhookLog = typeof webhookLogs.$inferSelect;
+export type InsertWebhookLog = typeof webhookLogs.$inferInsert;
+
+/**
+ * Webhook Relations
+ */
+export const webhookEventsRelations = relations(webhookEvents, ({ one, many }) => ({
+  hub: one(patientHubs, {
+    fields: [webhookEvents.hubId],
+    references: [patientHubs.id],
+  }),
+  logs: many(webhookLogs),
+}));
+
+export const webhookLogsRelations = relations(webhookLogs, ({ one }) => ({
+  event: one(webhookEvents, {
+    fields: [webhookLogs.webhookEventId],
+    references: [webhookEvents.id],
   }),
 }));

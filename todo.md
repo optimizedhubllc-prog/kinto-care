@@ -187,3 +187,43 @@
 - [x] Create checkpoint with Smart International Routing (v705e3246)
 - [x] Document the feature for team reference (SMART_INTERNATIONAL_ROUTING.md)
 - [x] Prepare for Jaquez family beta testing (beta test scenarios documented)
+
+
+## Phase 14: n8n Webhook Integration - IN PROGRESS
+
+### Step 1: Webhook Schema & Database
+- [x] Add webhookEvents table to schema.ts (event_id, hub_id, payload, status, created_at)
+- [x] Add webhookLogs table for audit trail (log_id, webhook_id, status_code, response, timestamp)
+- [x] Generate and apply Drizzle migration SQL
+
+### Step 2: Secure Webhook Endpoint
+- [x] Create /api/webhooks/notifications POST route
+- [x] Implement HMAC-SHA256 signature verification using WEBHOOK_SECRET
+- [x] Add request body validation (message, hubId required)
+- [x] Add rate limiting to prevent abuse
+- [x] Return 200 OK with event_id on success
+
+### Step 3: Real-Time Notifications
+- [ ] Create notification broadcasting system for hub members
+- [ ] Implement in-memory event emitter for real-time updates
+- [ ] Add tRPC subscription for client-side listening
+- [ ] Persist notification state in database
+
+### Step 4: Webhook Event Logging
+- [x] Log all webhook events to webhookLogs table
+- [x] Track event status (pending, delivered, failed)
+- [ ] Add error tracking and retry logic
+- [ ] Create admin view for webhook event history
+
+### Step 5: Webhook Management UI
+- [ ] Create webhook configuration page (Family Admin only)
+- [ ] Display webhook URL and secret
+- [ ] Add test webhook button
+- [ ] Show recent webhook events and delivery status
+
+### Step 6: Testing & Security
+- [x] Write vitest tests for webhook endpoint security (16 tests passing)
+- [x] Test HMAC signature verification
+- [x] Test rate limiting (payload size limits enforced)
+- [ ] Test hub member notification delivery
+- [ ] Create final checkpoint
