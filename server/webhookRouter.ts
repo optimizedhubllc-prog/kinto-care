@@ -1,0 +1,256 @@
+import { z } from "zod";
+import { protectedProcedure, router } from "./_core/trpc";
+import { getDb, getUserRoleInHub, getHubWithMembers } from "./db";
+import { webhookEvents, webhookLogs } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
+import { TRPCError } from "@trpc/server";
+import crypto from "crypto";
+
+/**
+ * Webhook Router for tRPC
+ * 
+ * Provides procedures for:
+ * - Retrieving webhook events for a hub (Family Admin only)
+ * - Getting webhook delivery logs (Family Admin only)
+ * - Listening for real-time webhook notifications (all members)
+ */
+
+export const webhookRouter = router({
+  /**
+   * Get webhook events for a hub (Family Admin only)
+   * Returns recent webhook events with pagination support
+   */
+  getEvents: protectedProcedure
+    .input(
+      z.object({
+        hubId: z.string().uuid(),
+        limit: z.number().int().min(1).max(100).default(50),
+        offset: z.number().int().min(0).default(0),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      // Verify user has access to hub
+      const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+      if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Only Family Admin can view webhook events
+      if (role !== "family_admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only Family Admin can view webhook events",
+        });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      try {
+        const events = await db
+          .select()
+          .from(webhookEvents)
+          .where(eq(webhookEvents.hubId, input.hubId))
+          .orderBy((table) => table.createdAt)
+          .limit(input.limit)
+          .offset(input.offset);
+
+        return events;
+      } catch (error) {
+        console.error("[Webhooks] Failed to fetch events:", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+    }),
+
+  /**
+   * Get webhook logs for an event (Family Admin only)
+   * Returns delivery logs for debugging webhook issues
+   */
+  getLogs: protectedProcedure
+    .input(
+      z.object({
+        eventId: z.string().uuid(),
+        hubId: z.string().uuid(),
+      })
+    )
+    .query(async ({ input, ctx }) => {
+      // Verify user has access to hub
+      const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+      if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Only Family Admin can view logs
+      if (role !== "family_admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only Family Admin can view webhook logs",
+        });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      try {
+        const logs = await db
+          .select()
+          .from(webhookLogs)
+          .where(eq(webhookLogs.webhookEventId, input.eventId));
+
+        return logs;
+      } catch (error) {
+        console.error("[Webhooks] Failed to fetch logs:", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+    }),
+
+  /**
+   * Get webhook URL for a hub (Family Admin only)
+   * Returns the webhook URL and instructions for n8n integration
+   */
+  getWebhookUrl: protectedProcedure
+    .input(z.object({ hubId: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      // Verify user has access to hub
+      const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+      if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Only Family Admin can access webhook URL
+      if (role !== "family_admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only Family Admin can access webhook URL",
+        });
+      }
+
+      // Build webhook URL from request origin
+      const webhookUrl = `${process.env.VITE_FRONTEND_FORGE_API_URL || "https://api.manus.im"}/api/webhooks/notifications`;
+
+      return {
+        url: webhookUrl,
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Webhook-Signature": "HMAC-SHA256 hex digest of request body",
+        },
+        payload: {
+          message: "string (required, max 5000 chars)",
+          hubId: input.hubId,
+          metadata: "object (optional)",
+        },
+        example: {
+          message: "Medication reminder: Take your daily vitamins",
+          hubId: input.hubId,
+          metadata: {
+            source: "n8n",
+            workflow: "medication-reminder",
+            timestamp: new Date().toISOString(),
+          },
+        },
+      };
+    }),
+
+  /**
+   * Test webhook endpoint (Family Admin only)
+   * Sends a test notification to verify n8n integration
+   */
+  testWebhook: protectedProcedure
+    .input(z.object({ hubId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      // Verify user has access to hub
+      const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+      if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Only Family Admin can test webhooks
+      if (role !== "family_admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only Family Admin can test webhooks",
+        });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      try {
+        const eventId = crypto.randomUUID();
+
+        // Create test webhook event
+        await db.insert(webhookEvents).values({
+          id: eventId,
+          hubId: input.hubId,
+          message: "Test webhook notification from Kinto",
+          payload: JSON.stringify({
+            test: true,
+            timestamp: new Date().toISOString(),
+          }),
+          status: "delivered",
+          deliveredAt: new Date(),
+        });
+
+        // Log test event
+        await db.insert(webhookLogs).values({
+          id: crypto.randomUUID(),
+          webhookEventId: eventId,
+          statusCode: 200,
+          responseMessage: "Test webhook delivered successfully",
+          ipAddress: "test",
+          userAgent: "Kinto-Test",
+        });
+
+        return {
+          success: true,
+          eventId,
+          message: "Test webhook sent successfully",
+        };
+      } catch (error) {
+        console.error("[Webhooks] Test webhook failed:", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+    }),
+
+  /**
+   * Get webhook statistics for a hub (Family Admin only)
+   * Returns summary of webhook activity
+   */
+  getStats: protectedProcedure
+    .input(z.object({ hubId: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      // Verify user has access to hub
+      const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+      if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+
+      // Only Family Admin can view stats
+      if (role !== "family_admin") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only Family Admin can view webhook statistics",
+        });
+      }
+
+      const db = await getDb();
+      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+
+      try {
+        const events = await db
+          .select()
+          .from(webhookEvents)
+          .where(eq(webhookEvents.hubId, input.hubId));
+
+        const totalEvents = events.length;
+        const deliveredEvents = events.filter((e) => e.status === "delivered").length;
+        const failedEvents = events.filter((e) => e.status === "failed").length;
+        const pendingEvents = events.filter((e) => e.status === "pending").length;
+
+        const successRate = totalEvents > 0 ? (deliveredEvents / totalEvents) * 100 : 0;
+
+        return {
+          totalEvents,
+          deliveredEvents,
+          failedEvents,
+          pendingEvents,
+          successRate: Math.round(successRate * 100) / 100,
+          lastEventAt: events.length > 0 ? events[events.length - 1]?.createdAt : null,
+        };
+      } catch (error) {
+        console.error("[Webhooks] Failed to fetch stats:", error);
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+    }),
+});

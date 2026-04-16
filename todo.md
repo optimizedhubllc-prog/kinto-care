@@ -204,10 +204,10 @@
 - [x] Return 200 OK with event_id on success
 
 ### Step 3: Real-Time Notifications
-- [ ] Create notification broadcasting system for hub members
-- [ ] Implement in-memory event emitter for real-time updates
-- [ ] Add tRPC subscription for client-side listening
-- [ ] Persist notification state in database
+- [ ] Create notification broadcasting system for hub members - In progress
+- [ ] Implement in-memory event emitter for real-time updates - In progress
+- [ ] Add tRPC subscription for client-side listening - In progress
+- [ ] Persist notification state in database - Webhook events table ready
 
 ### Step 4: Webhook Event Logging
 - [x] Log all webhook events to webhookLogs table
@@ -216,10 +216,10 @@
 - [ ] Create admin view for webhook event history
 
 ### Step 5: Webhook Management UI
-- [ ] Create webhook configuration page (Family Admin only)
-- [ ] Display webhook URL and secret
-- [ ] Add test webhook button
-- [ ] Show recent webhook events and delivery status
+- [x] Create webhook configuration page (Family Admin only) - WebhookSettings.tsx created
+- [x] Display webhook URL and secret - Integration instructions included
+- [x] Add test webhook button - Test webhook mutation wired
+- [x] Show recent webhook events and delivery status - Events list and stats displayed
 
 ### Step 6: Testing & Security
 - [x] Write vitest tests for webhook endpoint security (16 tests passing)

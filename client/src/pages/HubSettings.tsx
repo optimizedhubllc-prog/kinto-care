@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import ResponsiveNav from "@/components/ResponsiveNav";
-import { Loader2, Trash2, Users, Shield, Eye } from "lucide-react";
+import { Loader2, Trash2, Users, Shield, Eye, Zap } from "lucide-react";
 
 /**
  * HubSettings Component
@@ -146,9 +146,19 @@ export default function HubSettings() {
       <div className="min-h-screen bg-gradient-to-br from-[#FFFBF0] to-slate-100">
         <div className="max-w-4xl mx-auto p-4 md:p-6 md:ml-0">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Hub Settings</h1>
-            <p className="text-slate-600 mt-2">Manage {hub?.patientName}'s care hub and team members</p>
+          <div className="mb-8 flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Hub Settings</h1>
+              <p className="text-slate-600 mt-2">Manage {hub?.patientName}'s care hub and team members</p>
+            </div>
+            <Button
+              onClick={() => setLocation(`/webhook-settings/${hubId}`)}
+              variant="outline"
+              className="flex items-center gap-2 rounded-[2rem] border-[#0D9488] text-[#0D9488] hover:bg-[#CCFBF1]"
+            >
+              <Zap className="h-4 w-4" />
+              Webhooks
+            </Button>
           </div>
 
           {/* Hub Information Card */}
