@@ -60,8 +60,9 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
                     ? "bg-[#0D9488] text-white shadow-md"
                     : "text-slate-700 hover:bg-[#CCFBF1] hover:text-[#0D9488]"
                 }`}
+                aria-current={isActive(item.path) ? "page" : undefined}
               >
-                <Icon className="h-5 w-5" />
+                <Icon className="h-5 w-5" aria-hidden="true" />
                 <span className="text-sm font-medium">{item.label}</span>
               </button>
             );
@@ -93,6 +94,9 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="p-2 hover:bg-[#F3E8D8] rounded-[2rem] text-slate-900 transition-colors"
+            aria-label={isMobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+            aria-expanded={isMobileMenuOpen}
+            aria-controls="mobile-menu"
           >
             {isMobileMenuOpen ? (
               <X className="h-6 w-6" />
@@ -104,26 +108,27 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
 
         {/* Mobile Menu Dropdown */}
         {isMobileMenuOpen && (
-          <div className="border-t border-[#E5D4C1] bg-[#FFFBF0]">
+          <div className="border-t border-[#E5D4C1] bg-[#FFFBF0]" id="mobile-menu" role="navigation" aria-label="Mobile navigation">
             <nav className="p-4 space-y-2">
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <button
-                    key={item.path}
-                    onClick={() => {
-                      setLocation(item.path);
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] transition-all duration-200 ${
-                      isActive(item.path)
-                        ? "bg-[#0D9488] text-white"
-                        : "text-slate-700 hover:bg-[#CCFBF1]"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    <span className="text-sm font-medium">{item.label}</span>
-                  </button>
+              <button
+                key={item.path}
+                onClick={() => {
+                  setLocation(item.path);
+                  setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] transition-all duration-200 ${
+                  isActive(item.path)
+                    ? "bg-[#0D9488] text-white"
+                    : "text-slate-700 hover:bg-[#CCFBF1]"
+                }`}
+                aria-current={isActive(item.path) ? "page" : undefined}
+              >
+                <Icon className="h-5 w-5" aria-hidden="true" />
+                <span className="text-sm font-medium">{item.label}</span>
+              </button>
                 );
               })}
               <button
@@ -132,8 +137,9 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
                   setIsMobileMenuOpen(false);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] text-slate-700 hover:bg-[#CCFBF1] transition-colors"
+                aria-label="Logout"
               >
-                <LogOut className="h-5 w-5" />
+                <LogOut className="h-5 w-5" aria-hidden="true" />
                 <span className="text-sm font-medium">Logout</span>
               </button>
             </nav>
@@ -155,8 +161,10 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
                     ? "text-[#0D9488] border-t-2 border-[#0D9488]"
                     : "text-slate-600 hover:text-[#0D9488]"
                 }`}
+                aria-label={item.label}
+                aria-current={isActive(item.path) ? "page" : undefined}
               >
-                <Icon className="h-6 w-6" />
+                <Icon className="h-6 w-6" aria-hidden="true" />
                 <span className="text-xs mt-1 font-medium">{item.label}</span>
               </button>
             );

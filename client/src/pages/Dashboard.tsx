@@ -146,7 +146,11 @@ export default function Dashboard() {
                   ))}
                 </div>
                 {isFamilyAdmin && (
-                  <Button className="w-full mt-4" variant="default">
+                  <Button
+                    className="w-full mt-4"
+                    variant="default"
+                    onClick={() => setLocation(`/hub-settings/${hubId}`)}
+                  >
                     Manage Members
                   </Button>
                 )}

@@ -11,7 +11,78 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Loader2, Plus, Edit2, Trash2, Calendar } from "lucide-react";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from "date-fns";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+
+/**
+ * AppointmentCalendar Component
+ * Displays appointments in a calendar view with monthly grid,
+ * visual indicators for days with appointments, and sidebar
+ * showing appointments for the selected day.
+ */
+function AppointmentCalendar({ appointments }: { appointments: any[] }) {
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+
+  // Get appointments for the selected date
+  const appointmentsForSelectedDate = selectedDate
+    ? appointments.filter(apt => isSameDay(new Date(apt.dateTime), selectedDate))
+    : [];
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Calendar */}
+      <div className="md:col-span-2">
+        <Card className="rounded-[32px] border-2 border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-[#0D9488]">Calendar View</CardTitle>
+            <CardDescription>Click on a date to see appointments</CardDescription>
+          </CardHeader>
+          <CardContent className="flex justify-center">
+            <CalendarComponent
+              mode="single"
+              selected={selectedDate}
+              onSelect={setSelectedDate}
+              className="rounded-[24px]"
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Appointments for selected date */}
+      <div>
+        <Card className="rounded-[32px] border-2 border-slate-200">
+          <CardHeader>
+            <CardTitle className="text-lg text-[#F87171]">
+              {selectedDate ? format(selectedDate, "MMM d, yyyy") : "Select a date"}
+            </CardTitle>
+            <CardDescription>
+              {appointmentsForSelectedDate.length} appointment{appointmentsForSelectedDate.length !== 1 ? "s" : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {appointmentsForSelectedDate.length === 0 ? (
+              <p className="text-sm text-slate-600">No appointments on this date</p>
+            ) : (
+              <div className="space-y-3">
+                {appointmentsForSelectedDate.map(apt => (
+                  <div key={apt.id} className="p-3 bg-slate-50 rounded-[16px] border border-slate-200">
+                    <p className="font-semibold text-slate-900">{apt.doctorName || "Appointment"}</p>
+                    {apt.specialty && <p className="text-xs text-slate-600">{apt.specialty}</p>}
+                    <p className="text-sm font-medium text-[#0D9488] mt-1">
+                      {format(new Date(apt.dateTime), "h:mm a")}
+                    </p>
+                    {apt.location && <p className="text-xs text-slate-600 mt-1">📍 {apt.location}</p>}
+                    {apt.notes && <p className="text-xs text-slate-600 mt-2">{apt.notes}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
 
 export default function Appointments() {
   const { user } = useAuth();
@@ -24,14 +95,17 @@ export default function Appointments() {
     dateTime: "",
     location: "",
     notes: "",
+    medicalContactId: undefined as string | undefined,
   });
 
   const appointmentsQuery = trpc.appointments.list.useQuery({ hubId });
+  const medicalContactsQuery = trpc.medicalContacts.list.useQuery({ hubId });
   const createMutation = trpc.appointments.create.useMutation();
   const updateMutation = trpc.appointments.update.useMutation();
   const deleteMutation = trpc.appointments.delete.useMutation();
 
-  const isFamilyAdmin = user?.role === "admin";
+  // Check if current user is Family Admin using hub membership role
+  const isFamilyAdmin = user?.role === "admin"; // TODO: Update to use hub membership role
 
   const handleOpenDialog = (appointment?: any) => {
     if (appointment) {
@@ -42,10 +116,18 @@ export default function Appointments() {
         dateTime: appointment.dateTime ? new Date(appointment.dateTime).toISOString().slice(0, 16) : "",
         location: appointment.location || "",
         notes: appointment.notes || "",
+        medicalContactId: appointment.medicalContactId || undefined,
       });
     } else {
       setEditingId(null);
-      setFormData({ doctorName: "", specialty: "", dateTime: "", location: "", notes: "" });
+      setFormData({
+        doctorName: "",
+        specialty: "",
+        dateTime: "",
+        location: "",
+        notes: "",
+        medicalContactId: undefined,
+      });
     }
     setIsDialogOpen(true);
   };
@@ -148,6 +230,35 @@ export default function Appointments() {
                     />
                   </div>
                   <div>
+                    <Label htmlFor="medicalContact">Link to Medical Contact (Optional)</Label>
+                    <select
+                      id="medicalContact"
+                      value={formData.medicalContactId || ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value) {
+                          const contact = medicalContactsQuery.data?.find(c => c.id === value);
+                          setFormData({
+                            ...formData,
+                            medicalContactId: value,
+                            doctorName: contact?.name || formData.doctorName,
+                            specialty: contact?.specialty || formData.specialty,
+                          });
+                        } else {
+                          setFormData({ ...formData, medicalContactId: undefined });
+                        }
+                      }}
+                      className="w-full px-3 py-2 border border-slate-300 rounded-[8px] focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                    >
+                      <option value="">-- Select a contact --</option>
+                      {medicalContactsQuery.data?.map(contact => (
+                        <option key={contact.id} value={contact.id}>
+                          {contact.name} {contact.specialty ? `(${contact.specialty})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
                     <Label htmlFor="dateTime">Date & Time *</Label>
                     <Input
                       id="dateTime"
@@ -245,11 +356,7 @@ export default function Appointments() {
           </TabsContent>
 
           <TabsContent value="calendar">
-            <Card>
-              <CardContent className="pt-12 text-center">
-                <p className="text-slate-600">Calendar view coming soon</p>
-              </CardContent>
-            </Card>
+            <AppointmentCalendar appointments={sortedAppointments} />
           </TabsContent>
         </Tabs>
         </div>

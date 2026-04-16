@@ -8,6 +8,7 @@ import Medications from "@/pages/Medications";
 import Appointments from "@/pages/Appointments";
 import CareLogistics from "@/pages/CareLogistics";
 import MedicalContacts from "@/pages/MedicalContacts";
+import HubSettings from "@/pages/HubSettings";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/onboarding" component={Onboarding} />
       <Route path="/dashboard/:hubId" component={Dashboard} />
+      <Route path="/hub-settings/:hubId" component={HubSettings} />
       <Route path="/medications/:hubId" component={Medications} />
       <Route path="/appointments/:hubId" component={Appointments} />
       <Route path="/care-logistics/:hubId" component={CareLogistics} />
