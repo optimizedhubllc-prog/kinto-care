@@ -4,7 +4,9 @@ import { getDb, getUserRoleInHub, getHubWithMembers } from "./db";
 import { webhookEvents, webhookLogs } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { observable } from "@trpc/server/observable";
 import crypto from "crypto";
+import { notificationEmitter } from "./notificationEmitter";
 
 /**
  * Webhook Router for tRPC
@@ -102,7 +104,7 @@ export const webhookRouter = router({
 
   /**
    * Get webhook URL for a hub (Family Admin only)
-   * Returns the webhook URL and instructions for n8n integration
+   * Returns the unique webhook URL for n8n integration
    */
   getWebhookUrl: protectedProcedure
     .input(z.object({ hubId: z.string().uuid() }))
@@ -111,44 +113,36 @@ export const webhookRouter = router({
       const role = await getUserRoleInHub(ctx.user.id, input.hubId);
       if (!role) throw new TRPCError({ code: "FORBIDDEN" });
 
-      // Only Family Admin can access webhook URL
+      // Only Family Admin can view webhook URL
       if (role !== "family_admin") {
         throw new TRPCError({
           code: "FORBIDDEN",
-          message: "Only Family Admin can access webhook URL",
+          message: "Only Family Admin can view webhook configuration",
         });
       }
 
-      // Build webhook URL from request origin
-      const webhookUrl = `${process.env.VITE_FRONTEND_FORGE_API_URL || "https://api.manus.im"}/api/webhooks/notifications`;
+      // Return webhook URL (construct from environment)
+      const baseUrl = process.env.VITE_FRONTEND_FORGE_API_URL || "http://localhost:3000";
+      const webhookUrl = `${baseUrl}/api/webhooks/notifications`;
 
       return {
         url: webhookUrl,
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Webhook-Signature": "HMAC-SHA256 hex digest of request body",
+          "X-Webhook-Signature": "[HMAC-SHA256 of raw body]",
         },
         payload: {
           message: "string (required, max 5000 chars)",
           hubId: input.hubId,
           metadata: "object (optional)",
         },
-        example: {
-          message: "Medication reminder: Take your daily vitamins",
-          hubId: input.hubId,
-          metadata: {
-            source: "n8n",
-            workflow: "medication-reminder",
-            timestamp: new Date().toISOString(),
-          },
-        },
       };
     }),
 
   /**
    * Test webhook endpoint (Family Admin only)
-   * Sends a test notification to verify n8n integration
+   * Sends a test notification to verify webhook is working
    */
   testWebhook: protectedProcedure
     .input(z.object({ hubId: z.string().uuid() }))
@@ -175,29 +169,24 @@ export const webhookRouter = router({
         await db.insert(webhookEvents).values({
           id: eventId,
           hubId: input.hubId,
-          message: "Test webhook notification from Kinto",
-          payload: JSON.stringify({
-            test: true,
-            timestamp: new Date().toISOString(),
-          }),
-          status: "delivered",
-          deliveredAt: new Date(),
+          message: "Test webhook notification - Kinto Care",
+          payload: JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
+          status: "pending",
         });
 
-        // Log test event
-        await db.insert(webhookLogs).values({
-          id: crypto.randomUUID(),
-          webhookEventId: eventId,
-          statusCode: 200,
-          responseMessage: "Test webhook delivered successfully",
-          ipAddress: "test",
-          userAgent: "Kinto-Test",
+        // Broadcast test notification
+        notificationEmitter.broadcastToHub({
+          hubId: input.hubId,
+          message: "Test webhook notification - Kinto Care",
+          eventId,
+          timestamp: Date.now(),
+          metadata: { test: true },
         });
 
         return {
           success: true,
           eventId,
-          message: "Test webhook sent successfully",
+          message: "Test notification sent to all hub members",
         };
       } catch (error) {
         console.error("[Webhooks] Test webhook failed:", error);
@@ -252,5 +241,43 @@ export const webhookRouter = router({
         console.error("[Webhooks] Failed to fetch stats:", error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
       }
+    }),
+
+  /**
+   * Subscribe to real-time webhook notifications for a hub
+   * All hub members can listen for notifications
+   * Broadcasts notifications as they arrive from webhooks
+   */
+  subscribe: protectedProcedure
+    .input(z.object({ hubId: z.string().uuid() }))
+    .subscription(({ input, ctx }) => {
+      return observable((emit) => {
+        // Verify user is member of hub
+        getUserRoleInHub(ctx.user.id, input.hubId).then((role) => {
+          if (!role) {
+            emit.error(new TRPCError({ code: "FORBIDDEN" }));
+            return;
+          }
+
+          // Generate unique client ID for this subscription
+          const clientId = `${ctx.user.id}-${Date.now()}-${Math.random()}`;
+
+          // Subscribe to hub notifications
+          const unsubscribe = notificationEmitter.subscribeToHub(input.hubId, clientId);
+
+          // Listen for notifications on this hub
+          const handler = (notification: any) => {
+            emit.next(notification);
+          };
+
+          notificationEmitter.on(`hub:${input.hubId}`, handler);
+
+          // Cleanup on disconnect
+          return () => {
+            notificationEmitter.removeListener(`hub:${input.hubId}`, handler);
+            unsubscribe();
+          };
+        });
+      });
     }),
 });

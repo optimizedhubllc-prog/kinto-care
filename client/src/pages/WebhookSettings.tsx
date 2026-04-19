@@ -1,5 +1,4 @@
 import { useState } from "react";
-
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +6,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Copy, Check, AlertTriangle, Zap } from "lucide-react";
 import { useParams } from "wouter";
+import { toast } from "sonner";
 
 /**
  * Webhook Settings Page
@@ -22,6 +22,23 @@ export default function WebhookSettings() {
   const { hubId } = useParams<{ hubId: string }>();
   const userQuery = trpc.auth.me.useQuery();
   const [copied, setCopied] = useState(false);
+  const [realtimeNotifications, setRealtimeNotifications] = useState<any[]>([]);
+
+  // Subscribe to real-time webhook notifications
+  const notificationSubscription = trpc.webhooks.subscribe.useSubscription(
+    { hubId: hubId || "" },
+    {
+      enabled: !!hubId,
+      onData: (notification: any) => {
+        // Add notification to list and show toast
+        setRealtimeNotifications((prev) => [notification, ...prev].slice(0, 20));
+        toast.success(`Webhook: ${notification.message}`);
+      },
+      onError: (error) => {
+        console.error("Subscription error:", error);
+      },
+    }
+  );
 
   // Fetch webhook data
   const webhookUrlQuery = trpc.webhooks.getWebhookUrl.useQuery(
@@ -62,6 +79,21 @@ export default function WebhookSettings() {
   };
 
   if (!hubId) return <div>Hub not found</div>;
+
+  // Check if user is Family Admin
+  const isAdmin = userQuery.data?.role === "admin";
+  if (!isAdmin) {
+    return (
+      <div className="p-6">
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Only Family Admin can access webhook settings
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 p-6">
@@ -224,25 +256,55 @@ const signature = crypto
         </Card>
       )}
 
+      {/* Real-Time Notifications */}
+      {realtimeNotifications.length > 0 && (
+        <Card className="border-teal-200 bg-teal-50">
+          <CardHeader>
+            <CardTitle className="text-teal-900">Live Notifications</CardTitle>
+            <CardDescription>Incoming webhook notifications in real-time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {realtimeNotifications.map((notification, idx) => (
+                <div
+                  key={`${notification.eventId}-${idx}`}
+                  className="p-3 bg-white border border-teal-200 rounded-lg text-sm"
+                >
+                  <p className="font-medium text-teal-900">{notification.message}</p>
+                  <p className="text-xs text-teal-700 mt-1">
+                    {new Date(notification.timestamp).toLocaleTimeString()}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent Events */}
       {eventsQuery.data && eventsQuery.data.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Events</CardTitle>
-            <CardDescription>Last 10 webhook events</CardDescription>
+            <CardTitle>Event History</CardTitle>
+            <CardDescription>Last 10 webhook events (stored in database)</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
               {eventsQuery.data.map((event) => (
                 <div
                   key={event.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
+                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition"
                 >
                   <div className="flex-1 min-w-0">
                     <p className="font-medium truncate">{event.message}</p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(event.createdAt).toLocaleString()}
                     </p>
+                    {event.payload && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        ID: {event.id}
+                      </p>
+                    )}
                   </div>
                   <Badge
                     variant={
