@@ -43,28 +43,34 @@
 }
 
 /**
- * KINTO BETA 1.1: FAMILIAL WARMTH THEME
+ * KINTO CARE: HYBRID HEART BRANDING SYSTEM (v1.2)
  * 
- * Color Palette:
- * - Background: #FFFBF0 (Warm Beige)
- * - Primary: #0D9488 (Teal)
- * - Accent: #F87171 (Coral)
+ * Color Palette (Approved April 2026):
+ * - Primary Accent: #DC2626 (Red) - Healthcare symbol, outer heart border, critical alerts
+ * - Brand Primary: #0D9488 (Kinto Teal) - Inner KC monogram, buttons, interactive elements
+ * - Background: #FDF8F2 (Soft Linen) - Main UI surfaces, reduces eye strain
+ * - Typography: #1A2B3C (Deep Navy) - Headings, primary text, trust/authority
  * 
  * Typography:
- * - Body: Inter (400, 500, 600, 700)
- * - Headings: Playfair Display (600, 700, 800)
+ * - Headings: Playfair Display (Serif) - Authority, clinical-grade trust
+ * - Body & Data: Inter (Sans-serif) - Legibility for medication dosages, schedules
  * 
  * Border Radius: 32px for cards (2rem)
+ * 
+ * Logo Integration:
+ * - Red outer border (healthcare symbol)
+ * - Teal internal "KC" monogram (technical competence)
+ * - Verified badge for Seer Engine extracted data
  */
 
 :root {
-  /* Primary color: Teal #0D9488 */
+  /* HYBRID HEART BRANDING: Primary color - Kinto Teal #0D9488 */
   --primary: #0D9488;
-  --primary-foreground: #FFFBF0;
+  --primary-foreground: #FDF8F2;
   --sidebar-primary: #0D9488;
-  --sidebar-primary-foreground: #FFFBF0;
+  --sidebar-primary-foreground: #FDF8F2;
   
-  /* Chart colors: Teal variations */
+  /* Chart colors: Teal variations for data visualization */
   --chart-1: #14B8A6;
   --chart-2: #0D9488;
   --chart-3: #0F766E;
@@ -74,50 +80,56 @@
   /* Border radius: 32px for cards */
   --radius: 2rem;
   
-  /* Background: Warm Beige #FFFBF0 */
-  --background: #FFFBF0;
-  --foreground: #1F2937;
+  /* Background: Soft Linen #FDF8F2 - Reduces eye strain */
+  --background: #FDF8F2;
+  --foreground: #1A2B3C;
   
-  /* Card: Warm white with slight warmth */
+  /* Card: Soft Linen with slight warmth */
   --card: #FFFEF9;
-  --card-foreground: #1F2937;
+  --card-foreground: #1A2B3C;
   
   /* Popover: Light warm background */
   --popover: #FFFEF9;
-  --popover-foreground: #1F2937;
+  --popover-foreground: #1A2B3C;
   
   /* Secondary: Light teal */
   --secondary: #CCFBF1;
   --secondary-foreground: #0F766E;
   
-  /* Muted: Soft warm gray */
+  /* Muted: Soft Linen variations */
   --muted: #F3E8D8;
   --muted-foreground: #6B7280;
   
-  /* Accent: Coral #F87171 */
-  --accent: #F87171;
-  --accent-foreground: #FFFBF0;
+  /* Accent: Red #DC2626 - Healthcare symbol, outer heart border */
+  --accent: #DC2626;
+  --accent-foreground: #FDF8F2;
   
-  /* Destructive: Red for alerts */
+  /* Destructive: Red for critical alerts */
   --destructive: #DC2626;
-  --destructive-foreground: #FFFBF0;
+  --destructive-foreground: #FDF8F2;
   
   /* Border: Warm gray */
   --border: #E5D4C1;
   --input: #FFFEF9;
   --ring: #0D9488;
   
-  /* Sidebar: Warm white */
+  /* Sidebar: Soft Linen */
   --sidebar: #FFFEF9;
-  --sidebar-foreground: #1F2937;
-  --sidebar-accent: #F87171;
-  --sidebar-accent-foreground: #FFFBF0;
+  --sidebar-foreground: #1A2B3C;
+  --sidebar-accent: #DC2626;
+  --sidebar-accent-foreground: #FDF8F2;
   --sidebar-border: #E5D4C1;
   --sidebar-ring: #0D9488;
+  
+  /* Hybrid Heart specific colors */
+  --kinto-red: #DC2626;
+  --kinto-teal: #0D9488;
+  --kinto-linen: #FDF8F2;
+  --kinto-navy: #1A2B3C;
 }
 
 .dark {
-  /* Dark mode: Warm dark background */
+  /* Dark mode: Hybrid Heart adapted for dark backgrounds */
   --primary: #14B8A6;
   --primary-foreground: #0F3F3B;
   --sidebar-primary: #14B8A6;
@@ -138,7 +150,8 @@
   --muted: #3D3228;
   --muted-foreground: #A0A0A0;
   
-  --accent: #F87171;
+  /* Dark mode accent: Red for healthcare visibility */
+  --accent: #EF4444;
   --accent-foreground: #1A1410;
   
   --destructive: #EF4444;
@@ -156,10 +169,16 @@
   
   --sidebar: #2A2218;
   --sidebar-foreground: #F5E6D3;
-  --sidebar-accent: #F87171;
+  --sidebar-accent: #EF4444;
   --sidebar-accent-foreground: #1A1410;
   --sidebar-border: #3D3228;
   --sidebar-ring: #14B8A6;
+  
+  /* Hybrid Heart dark mode colors */
+  --kinto-red: #EF4444;
+  --kinto-teal: #14B8A6;
+  --kinto-linen: #2A2218;
+  --kinto-navy: #F5E6D3;
 }
 
 @layer base {

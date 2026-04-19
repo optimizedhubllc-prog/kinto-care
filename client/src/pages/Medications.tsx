@@ -232,15 +232,24 @@ export default function Medications() {
                     </div>
                   ) : scannedData ? (
                     <div className="space-y-4">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
-                        <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-semibold text-green-900">Label Scanned Successfully</p>
-                          <p className="text-sm text-green-700 mt-1">Please review the extracted information below and make any corrections before confirming.</p>
+                      {/* Hybrid Heart Verified Badge - Seer Engine Extraction */}
+                      <div className="bg-gradient-to-r from-teal-50 to-blue-50 border-2 border-[#0D9488] rounded-lg p-4 flex items-start gap-3">
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center justify-center h-8 w-8 rounded-full bg-[#0D9488] text-white font-bold text-sm">
+                            KC
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <p className="font-semibold text-[#1A2B3C]">Seer Engine Verified</p>
+                            <span className="inline-block px-2 py-1 bg-[#0D9488] text-white text-xs font-bold rounded-full">Extracted</span>
+                          </div>
+                          <p className="text-sm text-[#1A2B3C] opacity-75">Medication label scanned and verified. Please review the extracted information below and make any corrections before confirming.</p>
                         </div>
                       </div>
 
-                      <form onSubmit={handleSubmit} className="space-y-4">
+                      {/* Soft Linen container for extracted data - Hybrid Heart design */}
+                      <form onSubmit={handleSubmit} className="space-y-4 bg-[#FDF8F2] p-4 rounded-[2rem] border border-[#E5D4C1]">
                         <div>
                           <Label htmlFor="name">Medication Name *</Label>
                           <Input

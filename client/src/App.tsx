@@ -15,6 +15,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
+import ComplianceFooter from "./components/ComplianceFooter";
 
 function Router() {
   const { user, loading } = useAuth();
@@ -50,7 +51,13 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
-          <Router />
+          <div className="flex flex-col min-h-screen">
+            <div className="flex-1">
+              <Router />
+            </div>
+            {/* Hybrid Heart Compliance Footer - Persistent across all pages */}
+            <ComplianceFooter />
+          </div>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>
