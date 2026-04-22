@@ -3,7 +3,6 @@ import { Request, Response } from "express";
 import { getDb, getUserHubs } from "./db";
 import { webhookEvents, webhookLogs } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-import { broadcastWebhookNotification } from "./notificationEmitter";
 
 /**
  * KINTO Webhook Handler
@@ -134,21 +133,7 @@ export async function handleWebhookNotification(req: Request, res: Response) {
 
       console.log(`[Webhooks] Event ${eventId} queued for hub ${hubId}`);
 
-      // 5. Broadcast notification to all hub members in real-time
-      try {
-        broadcastWebhookNotification(
-          hubId,
-          message,
-          eventId,
-          metadata
-        );
-        console.log(`[Webhooks] Notification broadcasted to hub ${hubId}`);
-      } catch (broadcastError) {
-        console.error(`[Webhooks] Failed to broadcast notification:`, broadcastError);
-        // Don't fail the request - notification is still queued in database
-      }
-
-      // 6. Return success response
+      // 5. Return success response
       return res.status(200).json({
         success: true,
         eventId,

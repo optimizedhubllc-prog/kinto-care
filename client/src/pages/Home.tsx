@@ -46,12 +46,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img 
-                src="/manus-storage/kinto-logo-hybrid-heart_3fb6ae96.png" 
-                alt="Kinto Care Logo" 
-                className="h-10 w-10 object-contain"
-              />
-              <h1 className="text-3xl font-bold text-slate-900" style={{ fontFamily: "'Playfair Display', serif" }}>Kinto</h1>
+              <Heart className="h-8 w-8 text-red-600" />
+              <h1 className="text-3xl font-bold text-slate-900">Kinto</h1>
             </div>
             <Button asChild size="lg">
               <a href={getLoginUrl()}>Sign In</a>

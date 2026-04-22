@@ -1,8 +1,7 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Pill, Calendar, Users, Stethoscope, Home, LogOut, Menu, X, Moon, Sun } from "lucide-react";
-import { useTheme } from "@/contexts/ThemeContext";
+import { Pill, Calendar, Users, Stethoscope, Home, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 interface ResponsiveNavProps {
@@ -22,7 +21,6 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { theme, toggleTheme } = useTheme();
 
   const navItems = [
     { label: "Dashboard", icon: Home, path: `/dashboard/${hubId}` },
@@ -43,18 +41,11 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
     <>
       {/* Desktop Sidebar - Familial Warmth Theme */}
       <div className="hidden md:fixed md:left-0 md:top-0 md:h-screen md:w-64 md:bg-gradient-to-b md:from-[#FFFBF0] md:to-[#F3E8D8] md:text-slate-900 md:flex md:flex-col md:border-r md:border-[#E5D4C1] md:shadow-lg">
-        <div className="p-6 border-b border-[#E5D4C1] flex items-center gap-3">
-          <img 
-            src="/manus-storage/kinto-logo-hybrid-heart_3fb6ae96.png" 
-            alt="Kinto Care Logo" 
-            className="h-12 w-12 object-contain"
-          />
-          <div>
-            <h1 className="text-2xl font-bold text-[#0D9488]" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Kinto
-            </h1>
-            <p className="text-xs text-slate-600">Care Hub</p>
-          </div>
+        <div className="p-6 border-b border-[#E5D4C1]">
+          <h1 className="text-2xl font-bold text-[#0D9488]" style={{ fontFamily: "'Playfair Display', serif" }}>
+            Kinto
+          </h1>
+          <p className="text-sm text-slate-600 mt-1">Care Hub</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
@@ -84,15 +75,6 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
             <p className="text-sm font-medium truncate text-slate-900">{user?.name}</p>
           </div>
           <Button
-            onClick={toggleTheme}
-            variant="ghost"
-            className="w-full justify-start text-slate-700 hover:bg-[#CCFBF1] hover:text-[#0D9488] rounded-[2rem]"
-            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
-          >
-            {theme === 'light' ? <Moon className="h-4 w-4 mr-2" /> : <Sun className="h-4 w-4 mr-2" />}
-            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-          </Button>
-          <Button
             onClick={handleLogout}
             variant="ghost"
             className="w-full justify-start text-slate-700 hover:bg-[#CCFBF1] hover:text-[#0D9488] rounded-[2rem]"
@@ -106,16 +88,9 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
       {/* Mobile Top Bar - Familial Warmth Theme */}
       <div className="md:hidden fixed top-0 left-0 right-0 bg-[#FFFBF0] border-b border-[#E5D4C1] z-50 shadow-sm">
         <div className="flex items-center justify-between p-4">
-          <div className="flex items-center gap-2">
-            <img 
-              src="/manus-storage/kinto-logo-hybrid-heart_3fb6ae96.png" 
-              alt="Kinto Care Logo" 
-              className="h-8 w-8 object-contain"
-            />
-            <h1 className="text-lg font-bold text-[#0D9488]" style={{ fontFamily: "'Playfair Display', serif" }}>
-              Kinto
-            </h1>
-          </div>
+          <h1 className="text-lg font-bold text-[#0D9488]" style={{ fontFamily: "'Playfair Display', serif" }}>
+            Kinto
+          </h1>
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className="p-2 hover:bg-[#F3E8D8] rounded-[2rem] text-slate-900 transition-colors"
