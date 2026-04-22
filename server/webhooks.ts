@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { getDb, getUserHubs } from "./db";
 import { webhookEvents, webhookLogs } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
+import eventBus from "./_core/eventBus";
 
 /**
  * KINTO Webhook Handler
@@ -133,7 +134,22 @@ export async function handleWebhookNotification(req: Request, res: Response) {
 
       console.log(`[Webhooks] Event ${eventId} queued for hub ${hubId}`);
 
-      // 5. Return success response
+      // 5. Emit event to real-time subscribers
+      const event = {
+        id: eventId,
+        hubId,
+        message,
+        payload: metadata ? JSON.stringify(metadata) : null,
+        status: "pending" as const,
+        deliveredAt: null,
+        failureReason: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      eventBus.emit(`webhook:hub:${hubId}`, event);
+      console.log(`[Webhooks] Event ${eventId} emitted to subscribers for hub ${hubId}`);
+
+      // 6. Return success response
       return res.status(200).json({
         success: true,
         eventId,

@@ -5,6 +5,7 @@ import { webhookEvents, webhookLogs } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
+import eventBus from "./_core/eventBus";
 
 /**
  * Webhook Router for tRPC
@@ -202,6 +203,68 @@ export const webhookRouter = router({
       } catch (error) {
         console.error("[Webhooks] Test webhook failed:", error);
         throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      }
+    }),
+
+  /**
+   * Subscribe to new webhook events for a hub (all members)
+   * Returns real-time webhook events as they arrive
+   */
+  onNewEvent: protectedProcedure
+    .input(z.object({ hubId: z.string().uuid() }))
+    .subscription(async function* ({ input, ctx }) {
+      // Verify user has access to hub
+      const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+      if (!role) {
+        throw new TRPCError({ code: "FORBIDDEN" });
+      }
+
+      // All hub members can subscribe to webhook events
+      const validRoles = ["family_admin", "family_viewer", "caregiver"];
+      if (!validRoles.includes(role)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Only hub members can subscribe to webhook events",
+        });
+      }
+
+      const eventKey = `webhook:hub:${input.hubId}`;
+      console.log(`[Webhooks] Subscription started for hub ${input.hubId} by user ${ctx.user.id}`);
+
+      // Create a queue to hold events
+      const eventQueue: any[] = [];
+      let resolveWait: (() => void) | null = null;
+
+      const handleEvent = (event: any) => {
+        eventQueue.push(event);
+        if (resolveWait) {
+          resolveWait();
+          resolveWait = null;
+        }
+      };
+
+      eventBus.on(eventKey, handleEvent);
+
+      try {
+        // Keep yielding events as they arrive
+        while (true) {
+          // If queue is empty, wait for next event
+          if (eventQueue.length === 0) {
+            await new Promise<void>((resolve) => {
+              resolveWait = resolve;
+            });
+          }
+
+          // Yield queued events
+          while (eventQueue.length > 0) {
+            const event = eventQueue.shift();
+            console.log(`[Webhooks] Yielding event to subscriber for hub ${input.hubId}`);
+            yield event;
+          }
+        }
+      } finally {
+        eventBus.removeListener(eventKey, handleEvent);
+        console.log(`[Webhooks] Subscription ended for hub ${input.hubId}`);
       }
     }),
 

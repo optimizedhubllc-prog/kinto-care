@@ -22,6 +22,20 @@
       "when": 1776338795583,
       "tag": "0002_colossal_titania",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1776813109126,
+      "tag": "0003_parched_anthem",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1776841361999,
+      "tag": "0004_chunky_photon",
+      "breakpoints": true
     }
   ]
 }

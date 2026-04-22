@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc";
 import { Loader2, Pill, Calendar, Users, Stethoscope } from "lucide-react";
 import { useParams, useLocation } from "wouter";
 import ResponsiveNav from "@/components/ResponsiveNav";
+import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -41,6 +42,7 @@ export default function Dashboard() {
 
   return (
     <>
+      <WebhookNotificationListener hubId={hubId} />
       <ResponsiveNav hubId={hubId} />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         <div className="max-w-6xl mx-auto p-4 md:p-6 md:ml-0">
