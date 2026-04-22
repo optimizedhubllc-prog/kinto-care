@@ -302,3 +302,53 @@ export const webhookLogsRelations = relations(webhookLogs, ({ one }) => ({
     references: [webhookEvents.id],
   }),
 }));
+
+
+/**
+ * Medication Audit Trail: Tracks all changes to medications for compliance and history.
+ * Records who made changes, when, and what was changed.
+ * Useful for caregiver coordination and medical provider communication.
+ */
+export const medicationAuditTrail = mysqlTable("medication_audit_trail", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  medicationId: varchar("medication_id", { length: 36 })
+    .notNull()
+    .references(() => medications.id, { onDelete: "cascade" }),
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  /** User who made the change */
+  changedBy: int("changed_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "restrict" }),
+  /** Type of change: created, updated, archived, restored */
+  changeType: mysqlEnum("change_type", ["created", "updated", "archived", "restored"]).notNull(),
+  /** Previous values (JSON stringified) */
+  previousValues: text("previous_values"),
+  /** New values (JSON stringified) */
+  newValues: text("new_values"),
+  /** Reason for change (optional) */
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type MedicationAuditTrail = typeof medicationAuditTrail.$inferSelect;
+export type InsertMedicationAuditTrail = typeof medicationAuditTrail.$inferInsert;
+
+/**
+ * Medication Audit Trail Relations
+ */
+export const medicationAuditTrailRelations = relations(medicationAuditTrail, ({ one }) => ({
+  medication: one(medications, {
+    fields: [medicationAuditTrail.medicationId],
+    references: [medications.id],
+  }),
+  hub: one(patientHubs, {
+    fields: [medicationAuditTrail.hubId],
+    references: [patientHubs.id],
+  }),
+  user: one(users, {
+    fields: [medicationAuditTrail.changedBy],
+    references: [users.id],
+  }),
+}));

@@ -1,7 +1,8 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Pill, Calendar, Users, Stethoscope, Home, LogOut, Menu, X } from "lucide-react";
+import { Pill, Calendar, Users, Stethoscope, Home, LogOut, Menu, X, Moon, Sun } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 import { useState } from "react";
 
 interface ResponsiveNavProps {
@@ -21,6 +22,7 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
   const { user, logout } = useAuth();
   const [location, setLocation] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
 
   const navItems = [
     { label: "Dashboard", icon: Home, path: `/dashboard/${hubId}` },
@@ -81,6 +83,15 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
             <p className="text-xs text-slate-600">Logged in as</p>
             <p className="text-sm font-medium truncate text-slate-900">{user?.name}</p>
           </div>
+          <Button
+            onClick={toggleTheme}
+            variant="ghost"
+            className="w-full justify-start text-slate-700 hover:bg-[#CCFBF1] hover:text-[#0D9488] rounded-[2rem]"
+            title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+          >
+            {theme === 'light' ? <Moon className="h-4 w-4 mr-2" /> : <Sun className="h-4 w-4 mr-2" />}
+            {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
+          </Button>
           <Button
             onClick={handleLogout}
             variant="ghost"
