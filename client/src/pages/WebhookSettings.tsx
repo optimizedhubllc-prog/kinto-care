@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, AlertTriangle, Zap, Search, X } from "lucide-react";
-import { useParams } from "wouter";
+import { Copy, Check, AlertTriangle, Zap, Search, X, ChevronDown, ChevronUp, Clock, AlertCircle } from "lucide-react";
+import { useParams, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 
 /**
@@ -15,16 +15,39 @@ import { Input } from "@/components/ui/input";
  * - View webhook URL and integration instructions
  * - Test webhook connectivity
  * - View webhook event history and statistics
- * - Monitor delivery status
+ * - Monitor delivery status with expandable details
  * - Search and filter webhook events
+ * - View delivery logs for each event
  */
 
 export default function WebhookSettings() {
   const { hubId } = useParams<{ hubId: string }>();
+  const [, navigate] = useLocation();
   const userQuery = trpc.auth.me.useQuery();
   const [copied, setCopied] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "delivered" | "failed">("all");
+  const [dateRangeFilter, setDateRangeFilter] = useState<"all" | "today" | "week" | "month">("all");
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null);
+
+  // Fetch hub to check user's role
+  const hubQuery = trpc.hubs.getById.useQuery(
+    { hubId: hubId || "" },
+    { enabled: !!hubId }
+  );
+
+  // Check if current user is Family Admin
+  const isFamilyAdmin = hubQuery.data?.members?.some(
+    m => m.userId === userQuery.data?.id && m.role === 'family_admin'
+  );
+
+  // Role-based access control: only family_admin can view webhook settings
+  useEffect(() => {
+    if (hubQuery.data && userQuery.data && !isFamilyAdmin) {
+      // Redirect non-admin users to dashboard
+      navigate(`/hubs/${hubId}/dashboard`);
+    }
+  }, [isFamilyAdmin, hubId, navigate, hubQuery.data, userQuery.data]);
 
   // Fetch webhook data
   const webhookUrlQuery = trpc.webhooks.getWebhookUrl.useQuery(
@@ -38,8 +61,14 @@ export default function WebhookSettings() {
   );
 
   const eventsQuery = trpc.webhooks.getEvents.useQuery(
-    { hubId: hubId || "", limit: 50 },
+    { hubId: hubId || "", limit: 100 },
     { enabled: !!hubId }
+  );
+
+  // Fetch logs for expanded event
+  const logsQuery = trpc.webhooks.getLogs.useQuery(
+    { eventId: expandedEventId || "", hubId: hubId || "" },
+    { enabled: !!expandedEventId && !!hubId }
   );
 
   const testWebhookMutation = trpc.webhooks.testWebhook.useMutation({
@@ -64,12 +93,51 @@ export default function WebhookSettings() {
     }
   };
 
-  // Filter events based on search and status
+  // Filter events by date range
+  const filterByDateRange = (event: any) => {
+    const eventDate = new Date(event.createdAt);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    switch (dateRangeFilter) {
+      case "today":
+        return eventDate >= today;
+      case "week":
+        return eventDate >= weekAgo;
+      case "month":
+        return eventDate >= monthAgo;
+      default:
+        return true;
+    }
+  };
+
+  // Filter events based on search, status, and date range
   const filteredEvents = (eventsQuery.data || []).filter((event) => {
     const matchesSearch = event.message.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || event.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesDateRange = filterByDateRange(event);
+    return matchesSearch && matchesStatus && matchesDateRange;
   });
+
+  // Calculate event counts
+  const eventCounts = {
+    total: eventsQuery.data?.length || 0,
+    delivered: eventsQuery.data?.filter((e) => e.status === "delivered").length || 0,
+    failed: eventsQuery.data?.filter((e) => e.status === "failed").length || 0,
+    pending: eventsQuery.data?.filter((e) => e.status === "pending").length || 0,
+  };
+
+  // Show loading state while checking auth
+  if (userQuery.isLoading || hubQuery.isLoading) {
+    return <div className="p-6">Loading...</div>;
+  }
+
+  // Prevent rendering if user is not family_admin (redirect happens in useEffect)
+  if (!isFamilyAdmin) {
+    return null;
+  }
 
   if (!hubId) return <div>Hub not found</div>;
 
@@ -234,16 +302,36 @@ const signature = crypto
         </Card>
       )}
 
-      {/* Recent Events with Search & Filter */}
+      {/* Admin Event History */}
       {eventsQuery.data && eventsQuery.data.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Event History</CardTitle>
-            <CardDescription>Search and filter webhook events</CardDescription>
+            <CardTitle>Admin Event History</CardTitle>
+            <CardDescription>Detailed webhook event tracking and delivery logs</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Event Count Summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-muted/50 rounded-lg p-3">
+                <p className="text-xs text-muted-foreground mb-1">Total</p>
+                <p className="text-xl font-bold">{eventCounts.total}</p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-3">
+                <p className="text-xs text-green-700 mb-1">Delivered</p>
+                <p className="text-xl font-bold text-green-600">{eventCounts.delivered}</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-3">
+                <p className="text-xs text-red-700 mb-1">Failed</p>
+                <p className="text-xl font-bold text-red-600">{eventCounts.failed}</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-3">
+                <p className="text-xs text-amber-700 mb-1">Pending</p>
+                <p className="text-xl font-bold text-amber-600">{eventCounts.pending}</p>
+              </div>
+            </div>
+
             {/* Search and Filter Controls */}
-            <div className="space-y-3">
+            <div className="space-y-3 border-t pt-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -262,68 +350,174 @@ const signature = crypto
                 )}
               </div>
 
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={statusFilter === "all" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter("all")}
-                >
-                  All ({eventsQuery.data.length})
-                </Button>
-                <Button
-                  variant={statusFilter === "pending" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter("pending")}
-                >
-                  Pending ({eventsQuery.data.filter((e) => e.status === "pending").length})
-                </Button>
-                <Button
-                  variant={statusFilter === "delivered" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter("delivered")}
-                >
-                  Delivered ({eventsQuery.data.filter((e) => e.status === "delivered").length})
-                </Button>
-                <Button
-                  variant={statusFilter === "failed" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setStatusFilter("failed")}
-                >
-                  Failed ({eventsQuery.data.filter((e) => e.status === "failed").length})
-                </Button>
+              <div className="space-y-2">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={statusFilter === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStatusFilter("all")}
+                  >
+                    All ({eventCounts.total})
+                  </Button>
+                  <Button
+                    variant={statusFilter === "pending" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStatusFilter("pending")}
+                  >
+                    Pending ({eventCounts.pending})
+                  </Button>
+                  <Button
+                    variant={statusFilter === "delivered" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStatusFilter("delivered")}
+                  >
+                    Delivered ({eventCounts.delivered})
+                  </Button>
+                  <Button
+                    variant={statusFilter === "failed" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setStatusFilter("failed")}
+                  >
+                    Failed ({eventCounts.failed})
+                  </Button>
+                </div>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant={dateRangeFilter === "all" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDateRangeFilter("all")}
+                  >
+                    All Time
+                  </Button>
+                  <Button
+                    variant={dateRangeFilter === "today" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDateRangeFilter("today")}
+                  >
+                    Today
+                  </Button>
+                  <Button
+                    variant={dateRangeFilter === "week" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDateRangeFilter("week")}
+                  >
+                    Last 7 Days
+                  </Button>
+                  <Button
+                    variant={dateRangeFilter === "month" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDateRangeFilter("month")}
+                  >
+                    Last 30 Days
+                  </Button>
+                </div>
               </div>
             </div>
 
-            {/* Events List */}
-            <div className="space-y-3">
+            {/* Events Table */}
+            <div className="border rounded-lg overflow-hidden">
               {filteredEvents.length > 0 ? (
-                filteredEvents.map((event) => (
-                  <div
-                    key={event.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{event.message}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(event.createdAt).toLocaleString()}
-                      </p>
+                <div className="divide-y">
+                  {filteredEvents.map((event) => (
+                    <div key={event.id}>
+                      {/* Event Row */}
+                      <button
+                        onClick={() => setExpandedEventId(expandedEventId === event.id ? null : event.id)}
+                        className="w-full text-left p-4 hover:bg-muted/50 transition-colors flex items-center justify-between gap-4"
+                      >
+                        <div className="flex-1 min-w-0 space-y-1">
+                          <p className="font-medium truncate">{event.message}</p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            {new Date(event.createdAt).toLocaleString()}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <Badge
+                            variant={
+                              event.status === "delivered"
+                                ? "default"
+                                : event.status === "failed"
+                                ? "destructive"
+                                : "secondary"
+                            }
+                          >
+                            {event.status}
+                          </Badge>
+                          {expandedEventId === event.id ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* Expanded Details */}
+                      {expandedEventId === event.id && (
+                        <div className="bg-muted/30 p-4 border-t space-y-4">
+                          {/* Event Payload */}
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">Event Payload</h4>
+                            <pre className="bg-background rounded p-3 text-xs overflow-auto border max-h-48">
+                              {event.payload
+                                ? JSON.stringify(JSON.parse(event.payload), null, 2)
+                                : "No payload"}
+                            </pre>
+                          </div>
+
+                          {/* Delivery Logs */}
+                          <div>
+                            <h4 className="font-semibold text-sm mb-2">Delivery Logs</h4>
+                            {logsQuery.isLoading ? (
+                              <div className="text-sm text-muted-foreground">Loading logs...</div>
+                            ) : logsQuery.data && logsQuery.data.length > 0 ? (
+                              <div className="space-y-2">
+                                {logsQuery.data.map((log, idx) => (
+                                  <div key={idx} className="bg-background rounded p-3 border text-sm space-y-1">
+                                    <div className="flex items-center justify-between">
+                                      <span className="font-mono text-xs">
+                                        Status: {log.statusCode}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {new Date(log.createdAt || "").toLocaleString()}
+                                      </span>
+                                    </div>
+                                    {log.responseMessage && (
+                                      <p className="text-muted-foreground">{log.responseMessage}</p>
+                                    )}
+                                    {log.ipAddress && (
+                                      <p className="text-xs text-muted-foreground">
+                                        IP: {log.ipAddress}
+                                      </p>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4" />
+                                No delivery logs available
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Failure Reason */}
+                          {event.failureReason && (
+                            <div className="bg-red-50 border border-red-200 rounded p-3">
+                              <p className="text-sm font-semibold text-red-900 mb-1">Failure Reason</p>
+                              <p className="text-sm text-red-800">{event.failureReason}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <Badge
-                      variant={
-                        event.status === "delivered"
-                          ? "default"
-                          : event.status === "failed"
-                          ? "destructive"
-                          : "secondary"
-                      }
-                    >
-                      {event.status}
-                    </Badge>
-                  </div>
-                ))
+                  ))}
+                </div>
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
-                  {searchQuery || statusFilter !== "all"
+                  {searchQuery || statusFilter !== "all" || dateRangeFilter !== "all"
                     ? "No events match your filters"
                     : "No webhook events yet"}
                 </div>
