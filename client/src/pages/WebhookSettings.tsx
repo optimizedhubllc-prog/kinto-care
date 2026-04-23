@@ -1,12 +1,12 @@
 import { useState } from "react";
-
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, AlertTriangle, Zap } from "lucide-react";
+import { Copy, Check, AlertTriangle, Zap, Search, X } from "lucide-react";
 import { useParams } from "wouter";
+import { Input } from "@/components/ui/input";
 
 /**
  * Webhook Settings Page
@@ -16,12 +16,15 @@ import { useParams } from "wouter";
  * - Test webhook connectivity
  * - View webhook event history and statistics
  * - Monitor delivery status
+ * - Search and filter webhook events
  */
 
 export default function WebhookSettings() {
   const { hubId } = useParams<{ hubId: string }>();
   const userQuery = trpc.auth.me.useQuery();
   const [copied, setCopied] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "delivered" | "failed">("all");
 
   // Fetch webhook data
   const webhookUrlQuery = trpc.webhooks.getWebhookUrl.useQuery(
@@ -35,7 +38,7 @@ export default function WebhookSettings() {
   );
 
   const eventsQuery = trpc.webhooks.getEvents.useQuery(
-    { hubId: hubId || "", limit: 10 },
+    { hubId: hubId || "", limit: 50 },
     { enabled: !!hubId }
   );
 
@@ -60,6 +63,13 @@ export default function WebhookSettings() {
       testWebhookMutation.mutate({ hubId });
     }
   };
+
+  // Filter events based on search and status
+  const filteredEvents = (eventsQuery.data || []).filter((event) => {
+    const matchesSearch = event.message.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || event.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   if (!hubId) return <div>Hub not found</div>;
 
@@ -224,39 +234,100 @@ const signature = crypto
         </Card>
       )}
 
-      {/* Recent Events */}
+      {/* Recent Events with Search & Filter */}
       {eventsQuery.data && eventsQuery.data.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Recent Events</CardTitle>
-            <CardDescription>Last 10 webhook events</CardDescription>
+            <CardTitle>Event History</CardTitle>
+            <CardDescription>Search and filter webhook events</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* Search and Filter Controls */}
             <div className="space-y-3">
-              {eventsQuery.data.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex items-center justify-between p-3 border rounded-lg"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{event.message}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(event.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={
-                      event.status === "delivered"
-                        ? "default"
-                        : event.status === "failed"
-                        ? "destructive"
-                        : "secondary"
-                    }
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by message..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
                   >
-                    {event.status}
-                  </Badge>
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  variant={statusFilter === "all" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("all")}
+                >
+                  All ({eventsQuery.data.length})
+                </Button>
+                <Button
+                  variant={statusFilter === "pending" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("pending")}
+                >
+                  Pending ({eventsQuery.data.filter((e) => e.status === "pending").length})
+                </Button>
+                <Button
+                  variant={statusFilter === "delivered" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("delivered")}
+                >
+                  Delivered ({eventsQuery.data.filter((e) => e.status === "delivered").length})
+                </Button>
+                <Button
+                  variant={statusFilter === "failed" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setStatusFilter("failed")}
+                >
+                  Failed ({eventsQuery.data.filter((e) => e.status === "failed").length})
+                </Button>
+              </div>
+            </div>
+
+            {/* Events List */}
+            <div className="space-y-3">
+              {filteredEvents.length > 0 ? (
+                filteredEvents.map((event) => (
+                  <div
+                    key={event.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{event.message}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(event.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={
+                        event.status === "delivered"
+                          ? "default"
+                          : event.status === "failed"
+                          ? "destructive"
+                          : "secondary"
+                      }
+                    >
+                      {event.status}
+                    </Badge>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  {searchQuery || statusFilter !== "all"
+                    ? "No events match your filters"
+                    : "No webhook events yet"}
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>

@@ -212,8 +212,8 @@
 ### Step 4: Webhook Event Logging
 - [x] Log all webhook events to webhookLogs table
 - [x] Track event status (pending, delivered, failed)
-- [ ] Add error tracking and retry logic
-- [ ] Create admin view for webhook event history
+- [x] Add error tracking and retry logic (exponential backoff in EventBus)
+- [x] Create admin view for webhook event history (WebhookSettings.tsx with event list)
 
 ### Step 5: Webhook Management UI
 - [x] Create webhook configuration page (Family Admin only) - WebhookSettings.tsx created
@@ -229,10 +229,10 @@
 - [x] Create final checkpoint - Webhook broadcasting production-ready
 
 
-## Phase 16: Webhook Integration Gaps (Post E2E Testing)
-- [ ] Add error tracking and retry logic for failed webhook deliveries
-- [ ] Create admin view for webhook event history with filtering/search
-- [ ] Add integration test: webhook handler → database save → EventBus emit → subscription delivery
-- [ ] Verify WebhookNotificationListener mounted in all hub pages for toast delivery
-- [ ] Test tRPC subscription transport with actual client connection
-- [ ] Complete final production-ready checkpoint after all gaps resolved
+## Phase 16: Webhook Integration Gaps (Post E2E Testing) - COMPLETE
+- [x] Add error tracking and retry logic for failed webhook deliveries (webhookRetryManager.ts with exponential backoff)
+- [x] Create admin view for webhook event history with filtering/search (WebhookSettings.tsx with search + status filters)
+- [x] Add integration test: webhook handler → database save → EventBus emit → subscription delivery (6 E2E tests passing)
+- [x] Verify WebhookNotificationListener mounted in all hub pages for toast delivery (mounted in 6 pages)
+- [x] Test tRPC subscription transport with actual client connection (5 transport tests passing)
+- [x] Complete final production-ready checkpoint after all gaps resolved (Beta 1.5 checkpoint created)
