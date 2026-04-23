@@ -1,3 +1,4 @@
+import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useParams } from "wouter";
 import { useState } from "react";
@@ -106,6 +107,7 @@ export default function MedicalContacts() {
   return (
     <>
       <ResponsiveNav hubId={hubId} />
+      <WebhookNotificationListener hubId={hubId} />
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-6 md:ml-0">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-8">

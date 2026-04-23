@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useParams } from "wouter";
 import ResponsiveNav from "@/components/ResponsiveNav";
+import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -162,6 +163,7 @@ export default function Medications() {
 
   return (
     <>
+      <WebhookNotificationListener hubId={hubId} />
       <ResponsiveNav hubId={hubId} />
       <div className="min-h-screen bg-gradient-to-br from-[#FFFBF0] to-slate-100 p-4 md:p-6 md:ml-0">
         <div className="max-w-4xl mx-auto">

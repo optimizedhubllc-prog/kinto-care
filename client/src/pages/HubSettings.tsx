@@ -1,3 +1,4 @@
+import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -143,6 +144,7 @@ export default function HubSettings() {
   return (
     <>
       <ResponsiveNav hubId={hubId} />
+      <WebhookNotificationListener hubId={hubId} />
       <div className="min-h-screen bg-gradient-to-br from-[#FFFBF0] to-slate-100">
         <div className="max-w-4xl mx-auto p-4 md:p-6 md:ml-0">
           {/* Header */}

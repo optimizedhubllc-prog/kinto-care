@@ -204,10 +204,10 @@
 - [x] Return 200 OK with event_id on success
 
 ### Step 3: Real-Time Notifications
-- [ ] Create notification broadcasting system for hub members - In progress
-- [ ] Implement in-memory event emitter for real-time updates - In progress
-- [ ] Add tRPC subscription for client-side listening - In progress
-- [ ] Persist notification state in database - Webhook events table ready
+- [x] Create notification broadcasting system for hub members - EventBus singleton implemented
+- [x] Implement in-memory event emitter for real-time updates - Node.js EventEmitter with hub channels
+- [x] Add tRPC subscription for client-side listening - onNewEvent subscription procedure added
+- [x] Persist notification state in database - Webhook events table ready
 
 ### Step 4: Webhook Event Logging
 - [x] Log all webhook events to webhookLogs table
@@ -225,5 +225,14 @@
 - [x] Write vitest tests for webhook endpoint security (16 tests passing)
 - [x] Test HMAC signature verification
 - [x] Test rate limiting (payload size limits enforced)
-- [ ] Test hub member notification delivery
-- [ ] Create final checkpoint
+- [x] Test hub member notification delivery - 5 E2E tests passing (emission, isolation, subscribers, rapid events, cleanup)
+- [x] Create final checkpoint - Webhook broadcasting production-ready
+
+
+## Phase 16: Webhook Integration Gaps (Post E2E Testing)
+- [ ] Add error tracking and retry logic for failed webhook deliveries
+- [ ] Create admin view for webhook event history with filtering/search
+- [ ] Add integration test: webhook handler → database save → EventBus emit → subscription delivery
+- [ ] Verify WebhookNotificationListener mounted in all hub pages for toast delivery
+- [ ] Test tRPC subscription transport with actual client connection
+- [ ] Complete final production-ready checkpoint after all gaps resolved
