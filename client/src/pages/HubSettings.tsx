@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import ResponsiveNav from "@/components/ResponsiveNav";
-import { Loader2, Trash2, Users, Shield, Eye, Zap } from "lucide-react";
+import { Loader2, Trash2, Users, Shield, Eye, Zap, History } from "lucide-react";
 
 /**
  * HubSettings Component
@@ -153,14 +153,24 @@ export default function HubSettings() {
               <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Hub Settings</h1>
               <p className="text-slate-600 mt-2">Manage {hub?.patientName}'s care hub and team members</p>
             </div>
-            <Button
-              onClick={() => setLocation(`/webhook-settings/${hubId}`)}
-              variant="outline"
-              className="flex items-center gap-2 rounded-[2rem] border-[#0D9488] text-[#0D9488] hover:bg-[#CCFBF1]"
-            >
-              <Zap className="h-4 w-4" />
-              Webhooks
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => setLocation(`/event-history/${hubId}`)}
+                variant="outline"
+                className="flex items-center gap-2 rounded-[2rem] border-[#0D9488] text-[#0D9488] hover:bg-[#CCFBF1]"
+              >
+                <History className="h-4 w-4" />
+                Event History
+              </Button>
+              <Button
+                onClick={() => setLocation(`/webhook-settings/${hubId}`)}
+                variant="outline"
+                className="flex items-center gap-2 rounded-[2rem] border-[#0D9488] text-[#0D9488] hover:bg-[#CCFBF1]"
+              >
+                <Zap className="h-4 w-4" />
+                Webhooks
+              </Button>
+            </div>
           </div>
 
           {/* Hub Information Card */}

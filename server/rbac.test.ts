@@ -399,3 +399,297 @@ describe("RBAC: Medical Contacts", () => {
     });
   });
 });
+
+
+describe("RBAC: Webhooks", () => {
+  // Test data for webhook procedures
+  const testWebhookEventData = {
+    eventId: "test-event-123",
+    hubId: testHubId,
+  };
+
+  describe("webhooks.getEvents", () => {
+    it("should allow family_admin to get webhook events", async () => {
+      const ctx = createContextWithRole("family_admin");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getEvents({ hubId: testHubId, limit: 10 });
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should deny family_viewer from getting webhook events", async () => {
+      const ctx = createContextWithRole("family_viewer");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getEvents({ hubId: testHubId, limit: 10 });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny caregiver from getting webhook events", async () => {
+      const ctx = createContextWithRole("caregiver");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getEvents({ hubId: testHubId, limit: 10 });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny unauthenticated user from getting webhook events", async () => {
+      const ctx = createUnauthenticatedContext();
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getEvents({ hubId: testHubId, limit: 10 });
+        expect.fail("Expected UNAUTHORIZED error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe("UNAUTHORIZED");
+        }
+      }
+    });
+  });
+
+  describe("webhooks.getLogs", () => {
+    it("should allow family_admin to get webhook logs", async () => {
+      const ctx = createContextWithRole("family_admin");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getLogs(testWebhookEventData);
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should deny family_viewer from getting webhook logs", async () => {
+      const ctx = createContextWithRole("family_viewer");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getLogs(testWebhookEventData);
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny caregiver from getting webhook logs", async () => {
+      const ctx = createContextWithRole("caregiver");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getLogs(testWebhookEventData);
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny unauthenticated user from getting webhook logs", async () => {
+      const ctx = createUnauthenticatedContext();
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getLogs(testWebhookEventData);
+        expect.fail("Expected UNAUTHORIZED error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe("UNAUTHORIZED");
+        }
+      }
+    });
+  });
+
+  describe("webhooks.getWebhookUrl", () => {
+    it("should allow family_admin to get webhook URL", async () => {
+      const ctx = createContextWithRole("family_admin");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getWebhookUrl({ hubId: testHubId });
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should deny family_viewer from getting webhook URL", async () => {
+      const ctx = createContextWithRole("family_viewer");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getWebhookUrl({ hubId: testHubId });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny caregiver from getting webhook URL", async () => {
+      const ctx = createContextWithRole("caregiver");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getWebhookUrl({ hubId: testHubId });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny unauthenticated user from getting webhook URL", async () => {
+      const ctx = createUnauthenticatedContext();
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getWebhookUrl({ hubId: testHubId });
+        expect.fail("Expected UNAUTHORIZED error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe("UNAUTHORIZED");
+        }
+      }
+    });
+  });
+
+  describe("webhooks.testWebhook", () => {
+    it("should allow family_admin to test webhook", async () => {
+      const ctx = createContextWithRole("family_admin");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.testWebhook({ hubId: testHubId });
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should deny family_viewer from testing webhook", async () => {
+      const ctx = createContextWithRole("family_viewer");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.testWebhook({ hubId: testHubId });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny caregiver from testing webhook", async () => {
+      const ctx = createContextWithRole("caregiver");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.testWebhook({ hubId: testHubId });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny unauthenticated user from testing webhook", async () => {
+      const ctx = createUnauthenticatedContext();
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.testWebhook({ hubId: testHubId });
+        expect.fail("Expected UNAUTHORIZED error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe("UNAUTHORIZED");
+        }
+      }
+    });
+  });
+
+  describe("webhooks.getStats", () => {
+    it("should allow family_admin to get webhook stats", async () => {
+      const ctx = createContextWithRole("family_admin");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getStats({ hubId: testHubId });
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should deny family_viewer from getting webhook stats", async () => {
+      const ctx = createContextWithRole("family_viewer");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getStats({ hubId: testHubId });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny caregiver from getting webhook stats", async () => {
+      const ctx = createContextWithRole("caregiver");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getStats({ hubId: testHubId });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(["FORBIDDEN", "BAD_REQUEST"]).toContain(error.code);
+        }
+      }
+    });
+
+    it("should deny unauthenticated user from getting webhook stats", async () => {
+      const ctx = createUnauthenticatedContext();
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.webhooks.getStats({ hubId: testHubId });
+        expect.fail("Expected UNAUTHORIZED error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe("UNAUTHORIZED");
+        }
+      }
+    });
+  });
+});
