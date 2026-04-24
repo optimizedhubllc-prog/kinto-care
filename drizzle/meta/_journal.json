@@ -36,6 +36,13 @@
       "when": 1776841361999,
       "tag": "0004_chunky_photon",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1777048582564,
+      "tag": "0005_left_vivisector",
+      "breakpoints": true
     }
   ]
 }
