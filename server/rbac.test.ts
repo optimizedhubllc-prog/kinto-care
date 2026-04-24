@@ -693,3 +693,101 @@ describe("RBAC: Webhooks", () => {
     });
   });
 });
+
+// ============================================================================
+// Users Router RBAC Tests
+// ============================================================================
+
+describe("RBAC: Users", () => {
+  describe("users.getByRole", () => {
+    it("should allow family_admin to get users by role", async () => {
+      const ctx = createContextWithRole("family_admin");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        const result = await caller.users.getByRole({
+          hubId: testHubId,
+          roleFilter: ["family_admin"],
+        });
+        expect(result.users).toBeDefined();
+        expect(Array.isArray(result.users)).toBe(true);
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should allow family_viewer to get users by role", async () => {
+      const ctx = createContextWithRole("family_viewer");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        const result = await caller.users.getByRole({
+          hubId: testHubId,
+          roleFilter: ["family_member"],
+        });
+        expect(result.users).toBeDefined();
+        expect(Array.isArray(result.users)).toBe(true);
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should allow caregiver to get users by role", async () => {
+      const ctx = createContextWithRole("caregiver");
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        const result = await caller.users.getByRole({
+          hubId: testHubId,
+          roleFilter: ["caregiver"],
+        });
+        expect(result.users).toBeDefined();
+        expect(Array.isArray(result.users)).toBe(true);
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).not.toBe("FORBIDDEN");
+        }
+      }
+    });
+
+    it("should deny unauthenticated user from getting users by role", async () => {
+      const ctx = createUnauthenticatedContext();
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.users.getByRole({
+          hubId: testHubId,
+          roleFilter: ["family_admin"],
+        });
+        expect.fail("Expected UNAUTHORIZED error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe("UNAUTHORIZED");
+        }
+      }
+    });
+
+    it("should deny user without hub access from getting users by role", async () => {
+      const ctx = createContextWithRole("family_admin");
+      // Mock getUserRoleInHub to return null (no access)
+      vi.spyOn(db, "getUserRoleInHub").mockResolvedValueOnce(null);
+      const caller = appRouter.createCaller(ctx);
+
+      try {
+        await caller.users.getByRole({
+          hubId: "non-existent-hub",
+          roleFilter: ["family_admin"],
+        });
+        expect.fail("Expected FORBIDDEN error");
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          expect(error.code).toBe("FORBIDDEN");
+        }
+      }
+    });
+  });
+});

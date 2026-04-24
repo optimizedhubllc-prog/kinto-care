@@ -351,3 +351,40 @@ export async function getMedicalContactById(contactId: string) {
 
   return result.length > 0 ? result[0] : null;
 }
+
+/**
+ * Get users in a hub filtered by role(s), including email addresses.
+ * Used by external services (n8n) to retrieve notification recipients.
+ * Only returns users with non-null emails.
+ */
+export async function getUsersByRole(
+  hubId: string,
+  roleFilter?: string[]
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  const { eq: drizzleEq, and } = await import('drizzle-orm');
+  
+  const query = db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      role: hubMembers.role,
+    })
+    .from(hubMembers)
+    .innerJoin(users, drizzleEq(hubMembers.userId, users.id))
+    .where(drizzleEq(hubMembers.hubId, hubId));
+
+  const results = await query;
+
+  // Filter by role if specified
+  let filtered = results;
+  if (roleFilter && roleFilter.length > 0) {
+    filtered = results.filter(r => roleFilter.includes(r.role));
+  }
+
+  // Return only users with non-null emails
+  return filtered.filter(r => r.email !== null && r.email !== undefined);
+}

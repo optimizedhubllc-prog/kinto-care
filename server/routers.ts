@@ -22,6 +22,7 @@ import {
   getHubMedicalContacts,
   getMedicalContactById,
   getDb,
+  getUsersByRole,
 } from "./db";
 import {
   patientHubs,
@@ -692,6 +693,27 @@ export const appRouter = router({
         await db.delete(careLogistics).where(eq(careLogistics.id, input.logisticId));
 
         return { success: true };
+      }),
+  }),
+
+  // ============================================================================
+  // KINTO: Users (for external services like n8n)
+  // ============================================================================
+  users: router({
+    getByRole: protectedProcedure
+      .input(
+        z.object({
+          hubId: z.string(),
+          roleFilter: z.array(z.enum(["family_admin", "family_member", "caregiver"])).optional(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        // Verify user has access to this hub
+        const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+        if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+        
+        const users = await getUsersByRole(input.hubId, input.roleFilter);
+        return { users };
       }),
   }),
 });
