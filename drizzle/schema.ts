@@ -303,3 +303,43 @@ export const webhookLogsRelations = relations(webhookLogs, ({ one }) => ({
     references: [webhookEvents.id],
   }),
 }));
+
+
+// ============================================================================
+// KINTO: API Keys for External Services (n8n, webhooks, etc.)
+// ============================================================================
+
+/**
+ * API Keys table for external service authentication.
+ * Used by n8n and other external services to call protected endpoints.
+ * Each API key is scoped to a hub and has specific permissions.
+ */
+export const apiKeys = mysqlTable("api_keys", {
+  id: varchar("id", { length: 36 }).primaryKey(), // UUID
+  hubId: varchar("hub_id", { length: 36 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(), // e.g., "n8n-notifications"
+  keyHash: varchar("key_hash", { length: 64 }).notNull().unique(), // SHA-256 hash of the key
+  permissions: varchar("permissions", { length: 255 }).notNull(), // Comma-separated: "users:read", "webhooks:write"
+  createdBy: int("created_by").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at"),
+  expiresAt: timestamp("expires_at"), // Optional expiration
+  isActive: boolean("is_active").default(true).notNull(),
+});
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type InsertApiKey = typeof apiKeys.$inferInsert;
+
+/**
+ * API Key Relations
+ */
+export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [apiKeys.hubId],
+    references: [patientHubs.id],
+  }),
+  creator: one(users, {
+    fields: [apiKeys.createdBy],
+    references: [users.id],
+  }),
+}));

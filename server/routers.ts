@@ -4,7 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { webhookRouter } from "./webhookRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router, apiKeyProcedure } from "./_core/trpc";
 import {
   getUserHubs,
   getHubWithMembers,
@@ -24,6 +24,7 @@ import {
   getDb,
   getUsersByRole,
 } from "./db";
+import { hasPermission } from "./apiKeyAuth";
 import {
   patientHubs,
   hubMembers,
@@ -713,6 +714,24 @@ export const appRouter = router({
         if (!role) throw new TRPCError({ code: "FORBIDDEN" });
         
         const users = await getUsersByRole(input.hubId, input.roleFilter);
+        return { users };
+      }),
+
+    // API key authenticated endpoint for external services (n8n)
+    getByRoleWithApiKey: apiKeyProcedure
+      .input(
+        z.object({
+          roleFilter: z.array(z.enum(["family_admin", "family_member", "caregiver"])).optional(),
+        })
+      )
+      .query(async ({ input, ctx }) => {
+        // Verify API key has required permission
+        if (!hasPermission(ctx.apiKey!.permissions, "users:read")) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "API key lacks users:read permission" });
+        }
+
+        // Use the hub ID from the API key context
+        const users = await getUsersByRole(ctx.apiKey!.hubId, input.roleFilter);
         return { users };
       }),
   }),

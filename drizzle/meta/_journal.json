@@ -43,6 +43,13 @@
       "when": 1777048582564,
       "tag": "0005_left_vivisector",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1777054358557,
+      "tag": "0006_sleepy_nicolaos",
+      "breakpoints": true
     }
   ]
 }

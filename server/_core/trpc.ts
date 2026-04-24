@@ -43,3 +43,21 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+// API Key procedure for external services (n8n, webhooks, etc.)
+const requireApiKey = t.middleware(async opts => {
+  const { ctx, next } = opts;
+
+  if (!ctx.apiKey) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid or missing API key" });
+  }
+
+  return next({
+    ctx: {
+      ...ctx,
+      apiKey: ctx.apiKey,
+    },
+  });
+});
+
+export const apiKeyProcedure = t.procedure.use(requireApiKey);
