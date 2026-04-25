@@ -1,7 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { UNAUTHED_ERR_MSG } from '@shared/const';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { httpBatchLink, TRPCClientError } from "@trpc/client";
+import { httpBatchLink, splitLink, httpSubscriptionLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
@@ -37,17 +37,35 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+// Determine the subscription URL based on current window location
+const getSubscriptionUrl = () => {
+  if (typeof window === "undefined") return "ws://localhost:3000/api/trpc";
+  
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  const host = window.location.host;
+  return `${protocol}://${host}/api/trpc`;
+};
+
 const trpcClient = trpc.createClient({
   links: [
-    httpBatchLink({
-      url: "/api/trpc",
-      transformer: superjson,
-      fetch(input, init) {
-        return globalThis.fetch(input, {
-          ...(init ?? {}),
-          credentials: "include",
-        });
-      },
+    splitLink({
+      // Route subscriptions to httpSubscriptionLink
+      condition: (op) => op.type === "subscription",
+      true: httpSubscriptionLink({
+        url: getSubscriptionUrl(),
+        transformer: superjson,
+      }),
+      // Route queries and mutations to httpBatchLink
+      false: httpBatchLink({
+        url: "/api/trpc",
+        transformer: superjson,
+        fetch(input, init) {
+          return globalThis.fetch(input, {
+            ...(init ?? {}),
+            credentials: "include",
+          });
+        },
+      }),
     }),
   ],
 });

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, Check, AlertTriangle, Zap, Search, X, ChevronDown, ChevronUp, Clock, AlertCircle } from "lucide-react";
 import { useParams, useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
+import { Loader2 } from "lucide-react";
 
 /**
  * Webhook Settings Page
@@ -41,13 +42,33 @@ export default function WebhookSettings() {
     m => m.userId === userQuery.data?.id && m.role === 'family_admin'
   );
 
-  // Role-based access control: only family_admin can view webhook settings
-  useEffect(() => {
-    if (hubQuery.data && userQuery.data && !isFamilyAdmin) {
-      // Redirect non-admin users to dashboard
-      navigate(`/hubs/${hubId}/dashboard`);
-    }
-  }, [isFamilyAdmin, hubId, navigate, hubQuery.data, userQuery.data]);
+  // Show loading state while checking permissions
+  if (hubQuery.isLoading || userQuery.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  // Redirect if not Family Admin
+  if (!isFamilyAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="text-red-600">Access Denied</CardTitle>
+            <CardDescription>Only Family Admins can access webhook settings.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={() => navigate(`/hubs/${hubId}/dashboard`)} className="w-full">
+              Return to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   // Fetch webhook data
   const webhookUrlQuery = trpc.webhooks.getWebhookUrl.useQuery(

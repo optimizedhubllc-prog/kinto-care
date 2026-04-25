@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useParams } from "wouter";
 import ResponsiveNav from "@/components/ResponsiveNav";
-import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { Loader2, Plus, Edit2, Trash2, Camera, CheckCircle } from "lucide-react";
+import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 
 export default function Medications() {
   const { user } = useAuth();

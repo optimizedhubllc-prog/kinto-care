@@ -1,4 +1,3 @@
-import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 import { useState } from "react";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +12,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import ResponsiveNav from "@/components/ResponsiveNav";
 import { Loader2, Trash2, Users, Shield, Eye, Zap, History } from "lucide-react";
+import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
 
 /**
  * HubSettings Component
@@ -143,8 +143,8 @@ export default function HubSettings() {
 
   return (
     <>
-      <ResponsiveNav hubId={hubId} />
       <WebhookNotificationListener hubId={hubId} />
+      <ResponsiveNav hubId={hubId} />
       <div className="min-h-screen bg-gradient-to-br from-[#FFFBF0] to-slate-100">
         <div className="max-w-4xl mx-auto p-4 md:p-6 md:ml-0">
           {/* Header */}
