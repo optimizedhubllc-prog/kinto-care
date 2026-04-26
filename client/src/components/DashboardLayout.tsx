@@ -170,9 +170,12 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="font-semibold tracking-tight truncate">
-                    Navigation
-                  </span>
+                  {/* Kinto Care Heart Logo */}
+                  <img 
+                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663129010374/QJ3E2r9gCPZv4t7YHdCX6w/kinto-care-logo-9tzWLkBeKrJxhgw9C44J27.webp" 
+                    alt="Kinto Care" 
+                    className="h-8 w-auto"
+                  />
                 </div>
               ) : null}
             </div>

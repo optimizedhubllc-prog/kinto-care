@@ -41,11 +41,13 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
     <>
       {/* Desktop Sidebar - Familial Warmth Theme */}
       <div className="hidden md:fixed md:left-0 md:top-0 md:h-screen md:w-64 md:bg-gradient-to-b md:from-[#FFFBF0] md:to-[#F3E8D8] md:text-slate-900 md:flex md:flex-col md:border-r md:border-[#E5D4C1] md:shadow-lg">
-        <div className="p-6 border-b border-[#E5D4C1]">
-          <h1 className="text-2xl font-bold text-[#0D9488]" style={{ fontFamily: "'Playfair Display', serif" }}>
-            Kinto
-          </h1>
-          <p className="text-sm text-slate-600 mt-1">Care Hub</p>
+        <div className="p-6 border-b border-[#E5D4C1] flex items-center gap-3">
+          {/* Kinto Care Heart Logo */}
+          <img 
+            src="https://d2xsxph8kpxj0f.cloudfront.net/310519663129010374/QJ3E2r9gCPZv4t7YHdCX6w/kinto-care-logo-9tzWLkBeKrJxhgw9C44J27.webp" 
+            alt="Kinto Care" 
+            className="h-12 w-auto"
+          />
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
