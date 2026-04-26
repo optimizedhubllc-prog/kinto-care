@@ -126,6 +126,17 @@ export const medications = mysqlTable("medications", {
   createdBy: int("created_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  // Seer Engine: OCR Medication Label Extraction
+  prescriber: text("prescriber"),
+  refillDate: timestamp("refill_date"),
+  quantity: text("quantity"),
+  pharmacyName: text("pharmacy_name"),
+  pharmacyPhone: text("pharmacy_phone"),
+  confidence: varchar("confidence", { length: 20 }).default("medium"),
+  rawLabelImageUrl: text("raw_label_image_url"),
+  reviewed: boolean("reviewed").default(false),
+  reviewNotes: text("review_notes"),
+  extractedAt: timestamp("extracted_at"),
 });
 
 export type Medication = typeof medications.$inferSelect;
