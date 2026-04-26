@@ -4,6 +4,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { AlertCircle, Loader2 } from "lucide-react";
 import React, { useState } from "react";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export interface TaskCompletionConfirmDialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ export function TaskCompletionConfirmDialog({
   onConfirm,
   isLoading = false,
 }: TaskCompletionConfirmDialogProps) {
+  const { t } = useTranslation();
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +48,7 @@ export function TaskCompletionConfirmDialog({
       setNotes("");
       onOpenChange(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete task");
+      setError(err instanceof Error ? err.message : t('tasks.completeError'));
     }
   };
 
@@ -67,17 +69,17 @@ export function TaskCompletionConfirmDialog({
       <DialogContent className="w-full sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="text-xl font-playfair text-navy">
-            Mark Task Complete?
+            {t('tasks.markComplete')}
           </DialogTitle>
           <DialogDescription>
-            Confirm that you want to mark this task as complete.
+            {t('tasks.confirmComplete')}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Task Title Display */}
           <div className="bg-linen rounded-lg p-3 border border-gray-200">
-            <p className="text-sm font-medium text-gray-700">Task:</p>
+            <p className="text-sm font-medium text-gray-700">{t('tasks.task')}:</p>
             <p className="text-gray-900 font-semibold mt-1 line-clamp-2">{taskTitle}</p>
           </div>
 
@@ -92,11 +94,11 @@ export function TaskCompletionConfirmDialog({
           {/* Notes Field */}
           <div className="space-y-2">
             <Label htmlFor="completion-notes" className="text-sm font-medium text-gray-700">
-              Add a completion note (optional)
+              {t('tasks.addCompletionNote')} ({t('common.optional')})
             </Label>
             <Textarea
               id="completion-notes"
-              placeholder="e.g., Task completed successfully, no issues..."
+              placeholder={t('tasks.completionNotePlaceholder')}
               value={notes}
               onChange={(e) => {
                 const newValue = e.target.value;
@@ -110,7 +112,7 @@ export function TaskCompletionConfirmDialog({
             />
             <div className="flex justify-between items-center">
               <p className={`text-xs ${isOverLimit ? "text-red-600" : "text-gray-500"}`}>
-                {charCount} / {maxChars} characters
+                {charCount} / {maxChars} {t('common.characters')}
               </p>
             </div>
           </div>
@@ -124,7 +126,7 @@ export function TaskCompletionConfirmDialog({
               disabled={isLoading}
               className="flex-1"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="button"
@@ -135,10 +137,10 @@ export function TaskCompletionConfirmDialog({
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Completing...
+                  {t('tasks.completing')}
                 </>
               ) : (
-                "Confirm Complete"
+                t('tasks.confirmComplete')
               )}
             </Button>
           </div>

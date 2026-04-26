@@ -193,9 +193,9 @@ export default function Medications() {
   };
 
   // Format refill date as relative text
-  const formatRefillDate = (dateStr?: string): string => {
+  const formatRefillDate = (dateStr?: string | Date): string => {
     if (!dateStr) return "No refill date";
-    const date = new Date(dateStr);
+    const date = dateStr instanceof Date ? dateStr : new Date(dateStr);
     const today = new Date();
     const daysUntil = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 

@@ -120,13 +120,9 @@ function DashboardLayoutContent({
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   
-  // Filter menu items for caregiver role
+  // Filter menu items for caregiver role (check hub_member role, not user role)
   const getMenuItems = () => {
-    if (user?.role === "caregiver" && language === "es") {
-      return allMenuItems.filter((item: any) => 
-        item.path === "/" || item.path === "/tasks" || item.path === "/contacts"
-      );
-    }
+    // For now, show all items - caregiver role filtering is done at hub_member level
     return allMenuItems;
   };
   

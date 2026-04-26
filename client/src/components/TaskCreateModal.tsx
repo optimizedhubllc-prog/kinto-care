@@ -1,11 +1,11 @@
-import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc";
-
+import { useTranslation } from "@/contexts/LanguageContext";
 import { AlertCircle, Loader2 } from "lucide-react";
 import React, { useState } from "react";
 import { format, startOfToday } from "date-fns";
@@ -42,6 +42,7 @@ export function TaskCreateModal({
   onTaskCreated,
   users = [],
 }: TaskCreateModalProps) {
+  const { t } = useTranslation();
   // Toast notifications (using console for now - can be replaced with toast library)
   const [formData, setFormData] = useState({
     title: "",
@@ -77,21 +78,21 @@ export function TaskCreateModal({
     const newErrors: { [key: string]: string } = {};
 
     if (!formData.title.trim()) {
-      newErrors.title = "Title is required";
+      newErrors.title = t('tasks.titleRequired');
     }
 
     if (!formData.dueDate) {
-      newErrors.dueDate = "Due date is required";
+      newErrors.dueDate = t('tasks.dueDateRequired');
     } else {
       const selectedDate = new Date(formData.dueDate);
       const today = startOfToday();
       if (selectedDate < today) {
-        newErrors.dueDate = "Due date cannot be in the past";
+        newErrors.dueDate = t('tasks.dueDatePast');
       }
     }
 
     if (!formData.assignedTo) {
-      newErrors.assignedTo = "Please assign this task to someone";
+      newErrors.assignedTo = t('tasks.assignRequired');
     }
 
     setErrors(newErrors);
@@ -133,9 +134,9 @@ export function TaskCreateModal({
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-full sm:max-w-md max-h-screen sm:max-h-96 overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl font-playfair text-navy">Create New Task</DialogTitle>
+          <DialogTitle className="text-xl font-playfair text-navy">{t('tasks.createNewTask')}</DialogTitle>
           <DialogDescription>
-            Add a new care task and assign it to a family member or caregiver.
+            {t('tasks.createTaskDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -143,11 +144,11 @@ export function TaskCreateModal({
           {/* Title Field */}
           <div className="space-y-2">
             <Label htmlFor="title" className="text-sm font-medium text-gray-700">
-              Task Title *
+              {t('tasks.taskTitle')} *
             </Label>
             <Input
               id="title"
-              placeholder="e.g., Pick up medications from CVS"
+              placeholder={t('tasks.titlePlaceholder')}
               value={formData.title}
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               className={`h-9 text-sm ${errors.title ? "border-red-500" : ""}`}
@@ -164,11 +165,11 @@ export function TaskCreateModal({
           {/* Description Field */}
           <div className="space-y-2">
             <Label htmlFor="description" className="text-sm font-medium text-gray-700">
-              Description (optional)
+              {t('tasks.description')} ({t('common.optional')})
             </Label>
             <Textarea
               id="description"
-              placeholder="Add any additional details..."
+              placeholder={t('tasks.descriptionPlaceholder')}
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="min-h-20 text-sm resize-none"
@@ -179,16 +180,16 @@ export function TaskCreateModal({
           {/* Priority Field */}
           <div className="space-y-2">
             <Label htmlFor="priority" className="text-sm font-medium text-gray-700">
-              Priority *
+              {t('tasks.priority')} *
             </Label>
             <Select value={formData.priority} onValueChange={(value) => setFormData({ ...formData, priority: value as any })}>
               <SelectTrigger id="priority" className="h-9 text-sm" disabled={createTaskMutation.isPending}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="low">Low</SelectItem>
-                <SelectItem value="medium">Medium</SelectItem>
-                <SelectItem value="high">High</SelectItem>
+                <SelectItem value="low">{t('tasks.low')}</SelectItem>
+                <SelectItem value="medium">{t('tasks.medium')}</SelectItem>
+                <SelectItem value="high">{t('tasks.high')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -196,7 +197,7 @@ export function TaskCreateModal({
           {/* Due Date Field */}
           <div className="space-y-2">
             <Label htmlFor="dueDate" className="text-sm font-medium text-gray-700">
-              Due Date *
+              {t('tasks.dueDate')} *
             </Label>
             <Input
               id="dueDate"
@@ -218,11 +219,11 @@ export function TaskCreateModal({
           {/* Assigned To Field */}
           <div className="space-y-2">
             <Label htmlFor="assignedTo" className="text-sm font-medium text-gray-700">
-              Assign To *
+              {t('tasks.assignTo')} *
             </Label>
             <Select value={formData.assignedTo} onValueChange={(value) => setFormData({ ...formData, assignedTo: value })}>
               <SelectTrigger id="assignedTo" className={`h-9 text-sm ${errors.assignedTo ? "border-red-500" : ""}`} disabled={createTaskMutation.isPending}>
-                <SelectValue placeholder="Select a person" />
+                <SelectValue placeholder={t('tasks.selectPerson')} />
               </SelectTrigger>
               <SelectContent>
                 {users.map((user) => (
@@ -249,7 +250,7 @@ export function TaskCreateModal({
               disabled={createTaskMutation.isPending}
               className="flex-1"
             >
-              Cancel
+              {t('common.cancel')}
             </Button>
             <Button
               type="submit"
@@ -259,10 +260,10 @@ export function TaskCreateModal({
               {createTaskMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Creating...
+                  {t('tasks.creating')}
                 </>
               ) : (
-                "Create Task"
+                t('tasks.createTask')
               )}
             </Button>
           </div>
