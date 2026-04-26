@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface ExtractionResult {
   id: string;
@@ -43,6 +44,7 @@ export function MedicationReviewModal({
   onDiscard,
   isAdmin,
 }: MedicationReviewModalProps) {
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     medication_name: extraction.extracted.medication_name || "",
     dosage: extraction.extracted.dosage || "",
@@ -65,7 +67,7 @@ export function MedicationReviewModal({
 
   const handleSave = async () => {
     if (!formData.medication_name.trim()) {
-      alert("Medication name is required");
+      alert(t('medications.nameRequired'));
       return;
     }
 
@@ -105,15 +107,15 @@ export function MedicationReviewModal({
         {/* Header */}
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white">
           <div>
-            <h2 className="text-xl font-semibold text-[#1A2B3C]">Review Extraction</h2>
-            <p className="text-sm text-gray-600 mt-1">Edit fields and confirm before saving</p>
+            <h2 className="text-xl font-semibold text-[#1A2B3C]">{t('medications.reviewExtraction')}</h2>
+            <p className="text-sm text-gray-600 mt-1">{t('medications.editFieldsConfirm')}</p>
           </div>
           <div
             className={`px-3 py-1 rounded text-sm font-medium ${confidenceColors[extraction.confidence]}`}
           >
-            {extraction.confidence === "high" && "High Confidence"}
-            {extraction.confidence === "medium" && "Medium Confidence"}
-            {extraction.confidence === "low" && "Low Confidence"}
+            {extraction.confidence === "high" && t('medications.high')}
+            {extraction.confidence === "medium" && t('medications.medium')}
+            {extraction.confidence === "low" && t('medications.low')}
           </div>
         </div>
 
@@ -122,9 +124,9 @@ export function MedicationReviewModal({
           {/* Low Confidence Warning */}
           {extraction.confidence === "low" && (
             <div className="p-4 bg-red-50 border border-[#DC2626] rounded">
-              <p className="text-[#DC2626] font-medium">⚠️ Please verify this information</p>
+              <p className="text-[#DC2626] font-medium">⚠️ {t('medications.pleaseVerify')}</p>
               <p className="text-sm text-[#DC2626] mt-1">
-                Several fields could not be clearly extracted. Review and correct the information below.
+                {t('medications.lowConfidenceWarning')}
               </p>
             </div>
           )}
@@ -132,49 +134,49 @@ export function MedicationReviewModal({
           {/* Editable Fields */}
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Medication Name *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.medicationName')} *</label>
               <Input
                 value={formData.medication_name}
                 onChange={(e) => handleFieldChange("medication_name", e.target.value)}
-                placeholder="e.g., Aspirin"
+                placeholder={t('medications.aspirin')}
                 className="border-gray-300"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Dosage</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.dosage')}</label>
                 <Input
                   value={formData.dosage}
                   onChange={(e) => handleFieldChange("dosage", e.target.value)}
-                  placeholder="e.g., 500mg"
+                  placeholder={t('medications.dosagePlaceholder')}
                   className="border-gray-300"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Frequency</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.frequency')}</label>
                 <Input
                   value={formData.frequency}
                   onChange={(e) => handleFieldChange("frequency", e.target.value)}
-                  placeholder="e.g., Twice daily"
+                  placeholder={t('medications.frequencyPlaceholder')}
                   className="border-gray-300"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prescriber</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.prescriber')}</label>
               <Input
                 value={formData.prescriber}
                 onChange={(e) => handleFieldChange("prescriber", e.target.value)}
-                placeholder="e.g., Dr. Smith"
+                placeholder={t('medications.prescriberPlaceholder')}
                 className="border-gray-300"
               />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Refill Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.refillDate')}</label>
                 <Input
                   type="date"
                   value={formData.refill_date}
@@ -183,42 +185,42 @@ export function MedicationReviewModal({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.quantity')}</label>
                 <Input
                   value={formData.quantity}
                   onChange={(e) => handleFieldChange("quantity", e.target.value)}
-                  placeholder="e.g., 30 tablets"
+                  placeholder={t('medications.quantityPlaceholder')}
                   className="border-gray-300"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pharmacy Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.pharmacy')}</label>
               <Input
                 value={formData.pharmacy_name}
                 onChange={(e) => handleFieldChange("pharmacy_name", e.target.value)}
-                placeholder="e.g., CVS Pharmacy"
+                placeholder={t('medications.pharmacyPlaceholder')}
                 className="border-gray-300"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Pharmacy Phone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.pharmacyPhone')}</label>
               <Input
                 value={formData.pharmacy_phone}
                 onChange={(e) => handleFieldChange("pharmacy_phone", e.target.value)}
-                placeholder="e.g., (555) 123-4567"
+                placeholder={t('medications.pharmacyPhonePlaceholder')}
                 className="border-gray-300"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Review Notes (Optional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">{t('medications.reviewNotes')}</label>
               <Textarea
                 value={reviewNotes}
                 onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder="Add any notes about this extraction..."
+                placeholder={t('medications.reviewNotesPlaceholder')}
                 maxLength={280}
                 className="border-gray-300 resize-none h-24"
               />
@@ -238,7 +240,7 @@ export function MedicationReviewModal({
               disabled={isSaving}
               className="flex-1 bg-[#0D9488] hover:bg-[#0D7A6F] text-white"
             >
-              {isSaving ? "Saving..." : "✓ Confirm & Save"}
+              {isSaving ? t('common.saving') : `✓ ${t('medications.confirmSave')}`}
             </Button>
             <Button
               onClick={onDiscard}
@@ -246,7 +248,7 @@ export function MedicationReviewModal({
               className="flex-1"
               disabled={isSaving}
             >
-              ✕ Discard
+              ✗ {t('common.discard')}
             </Button>
           </div>
         </div>

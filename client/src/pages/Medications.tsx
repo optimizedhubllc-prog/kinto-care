@@ -1,4 +1,3 @@
-import { useState, useRef } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { useParams } from "wouter";
 import ResponsiveNav from "@/components/ResponsiveNav";
@@ -13,6 +12,8 @@ import { WebhookNotificationListener } from "@/components/WebhookNotificationLis
 import { MedicationLabelUpload } from "@/components/MedicationLabelUpload";
 import { SeerResultCard } from "@/components/SeerResultCard";
 import { MedicationReviewModal } from "@/components/MedicationReviewModal";
+import { useTranslation } from "@/contexts/LanguageContext";
+import { useState, useRef } from "react";
 
 /**
  * MedicationsPage - Complete Seer Engine Integration
@@ -25,6 +26,7 @@ import { MedicationReviewModal } from "@/components/MedicationReviewModal";
  * - Real-time review queue badge
  */
 export default function Medications() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { hubId } = useParams() as { hubId: string };
   
@@ -262,8 +264,8 @@ export default function Medications() {
           {/* Page Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Medications</h1>
-              <p className="text-slate-600 mt-2">Manage active and inactive medications</p>
+              <h1 className="text-3xl md:text-4xl font-bold text-slate-900">{t('medications.title')}</h1>
+              <p className="text-slate-600 mt-2">{t('medications.manageDescription')}</p>
             </div>
             {(isFamilyAdmin || isFamilyMember) && (
               <Button 
@@ -271,7 +273,7 @@ export default function Medications() {
                 className="bg-[#0D9488] hover:bg-[#0a7a6f]"
               >
                 <Camera className="mr-2 h-4 w-4" />
-                Scan Label
+                {t('medications.scanLabel')}
               </Button>
             )}
           </div>
@@ -286,7 +288,7 @@ export default function Medications() {
                   : "text-gray-600 hover:text-gray-900"
               }`}
             >
-              Medications
+              {t('medications.title')}
             </button>
             {isFamilyAdmin && (
               <button
@@ -297,7 +299,7 @@ export default function Medications() {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                Extraction History
+                {t('medications.extractionHistory')}
                 {unreviewed > 0 && (
                   <span className="ml-2 inline-flex items-center justify-center w-5 h-5 bg-[#DC2626] text-white text-xs font-bold rounded-full">
                     {unreviewed}

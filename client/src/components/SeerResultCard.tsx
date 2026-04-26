@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface SeerResultCardProps {
   result: {
@@ -28,6 +29,7 @@ interface SeerResultCardProps {
  * Shows all extracted fields, confidence badge, and compliance disclaimer
  */
 export function SeerResultCard({ result, onSave, onScanAgain, isSaving = false }: SeerResultCardProps) {
+  const { t } = useTranslation();
   const { extracted, confidence, disclaimer } = result;
 
   const confidenceColors = {
@@ -37,27 +39,27 @@ export function SeerResultCard({ result, onSave, onScanAgain, isSaving = false }
   };
 
   const confidenceLabels = {
-    high: "High Confidence",
-    medium: "Medium Confidence",
-    low: "Low Confidence - Verify Manually",
+    high: t('medications.high'),
+    medium: t('medications.medium'),
+    low: t('medications.lowConfidenceVerify'),
   };
 
   const fields = [
-    { label: "Medication Name", value: extracted.medication_name },
-    { label: "Dosage", value: extracted.dosage },
-    { label: "Frequency", value: extracted.frequency },
-    { label: "Prescriber", value: extracted.prescriber },
-    { label: "Refill Date", value: extracted.refill_date },
-    { label: "Quantity", value: extracted.quantity },
-    { label: "Pharmacy Name", value: extracted.pharmacy_name },
-    { label: "Pharmacy Phone", value: extracted.pharmacy_phone },
+    { label: t('medications.medicationName'), value: extracted.medication_name },
+    { label: t('medications.dosage'), value: extracted.dosage },
+    { label: t('medications.frequency'), value: extracted.frequency },
+    { label: t('medications.prescriber'), value: extracted.prescriber },
+    { label: t('medications.refillDate'), value: extracted.refill_date },
+    { label: t('medications.quantity'), value: extracted.quantity },
+    { label: t('medications.pharmacy'), value: extracted.pharmacy_name },
+    { label: t('medications.pharmacyPhone'), value: extracted.pharmacy_phone },
   ];
 
   return (
     <Card className="p-6 bg-white border border-[#E5D4C1] space-y-6">
       {/* Confidence Badge */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-[#1A2B3C]">Extraction Result</h3>
+        <h3 className="text-lg font-semibold text-[#1A2B3C]">{t('medications.extractionResult')}</h3>
         <div className={`px-3 py-1 rounded text-sm font-medium ${confidenceColors[confidence]}`}>
           {confidenceLabels[confidence]}
         </div>
@@ -66,9 +68,9 @@ export function SeerResultCard({ result, onSave, onScanAgain, isSaving = false }
       {/* Low Confidence Warning */}
       {confidence === "low" && (
         <div className="p-4 bg-red-50 border border-[#DC2626] rounded">
-          <p className="text-[#DC2626] font-medium">⚠️ Please verify this information manually</p>
+          <p className="text-[#DC2626] font-medium">⚠️ {t('medications.pleaseVerify')}</p>
           <p className="text-sm text-[#DC2626] mt-1">
-            Several fields could not be clearly extracted. Review and correct the information below before saving.
+            {t('medications.lowConfidenceWarning')}
           </p>
         </div>
       )}
@@ -95,17 +97,17 @@ export function SeerResultCard({ result, onSave, onScanAgain, isSaving = false }
           disabled={isSaving || confidence === "low"}
           className="flex-1 bg-[#0D9488] hover:bg-[#0D7A6F] text-white"
         >
-          {isSaving ? "Saving..." : "✓ Save to Hub"}
+          {isSaving ? t('common.saving') : `✓ ${t('medications.saveToHub')}`}
         </Button>
         <Button onClick={onScanAgain} variant="outline" className="flex-1" disabled={isSaving}>
-          📷 Scan Another
+          📷 {t('medications.scanAnother')}
         </Button>
       </div>
 
       {/* Low Confidence Save Note */}
       {confidence === "low" && (
         <p className="text-xs text-gray-600 text-center">
-          A family admin must review and manually save low-confidence extractions.
+          {t('medications.lowConfidenceAdminNote')}
         </p>
       )}
     </Card>

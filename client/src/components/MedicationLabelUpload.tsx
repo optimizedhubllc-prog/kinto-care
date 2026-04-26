@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 interface MedicationLabelUploadProps {
   hubId: string;
@@ -18,6 +19,7 @@ export function MedicationLabelUpload({
   onExtract,
   isLoading = false,
 }: MedicationLabelUploadProps) {
+  const { t } = useTranslation();
   const [preview, setPreview] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +34,12 @@ export function MedicationLabelUpload({
 
     // Validate file
     if (!ALLOWED_TYPES.includes(file.type)) {
-      setError("Please upload a JPG, PNG, or WebP image");
+      setError(t('medications.uploadError'));
       return;
     }
 
     if (file.size > MAX_FILE_SIZE) {
-      setError("File size must be less than 5MB");
+      setError(t('medications.fileSizeError'));
       return;
     }
 
@@ -60,7 +62,7 @@ export function MedicationLabelUpload({
 
   const handleSubmit = async () => {
     if (!selectedFile) {
-      setError("Please select an image");
+      setError(t('medications.selectImageError'));
       return;
     }
 
@@ -69,7 +71,7 @@ export function MedicationLabelUpload({
       reader.onload = async (e) => {
         const base64 = (e.target?.result as string).split(",")[1];
         if (!base64) {
-          setError("Failed to read file");
+          setError(t('medications.readFileError'));
           return;
         }
 
@@ -85,7 +87,7 @@ export function MedicationLabelUpload({
         });
 
         if (!result.ok) {
-          throw new Error("Extraction failed");
+          throw new Error(t('medications.extractionFailed'));
         }
 
         const data = await result.json();
@@ -95,7 +97,7 @@ export function MedicationLabelUpload({
       };
       reader.readAsDataURL(selectedFile);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Extraction failed");
+      setError(err instanceof Error ? err.message : t('medications.extractionFailed'));
     }
   };
 
@@ -110,12 +112,12 @@ export function MedicationLabelUpload({
   return (
     <Card className="p-6 bg-white border border-[#E5D4C1]">
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold text-[#1A2B3C]">Scan Medication Label</h3>
+        <h3 className="text-lg font-semibold text-[#1A2B3C]">{t('medications.scanMedicationLabel')}</h3>
 
         {/* Preview */}
         {preview && (
           <div className="relative w-full bg-gray-100 rounded-lg overflow-hidden">
-            <img src={preview} alt="Label preview" className="w-full h-auto" />
+            <img src={preview} alt={t('medications.labelPreview')} className="w-full h-auto" />
           </div>
         )}
 
@@ -138,7 +140,7 @@ export function MedicationLabelUpload({
             disabled={isLoading || !!preview}
             className="flex-1 bg-[#0D9488] hover:bg-[#0D7A6F] text-white"
           >
-            📷 Take Photo
+            📷 {t('medications.takePhoto')}
           </Button>
 
           {/* File Input */}
@@ -155,7 +157,7 @@ export function MedicationLabelUpload({
             variant="outline"
             className="flex-1"
           >
-            📁 Choose File
+            📁 {t('medications.chooseFile')}
           </Button>
         </div>
 
@@ -167,17 +169,17 @@ export function MedicationLabelUpload({
               disabled={isLoading}
               className="flex-1 bg-[#0D9488] hover:bg-[#0D7A6F] text-white"
             >
-              {isLoading ? "Scanning..." : "✓ Scan Label"}
+              {isLoading ? t('common.scanning') : `✓ ${t('medications.scanLabel')}`}
             </Button>
             <Button onClick={handleReset} variant="outline" className="flex-1" disabled={isLoading}>
-              ✕ Cancel
+              ✗ {t('common.cancel')}
             </Button>
           </div>
         )}
 
         {/* Info Text */}
         <p className="text-sm text-gray-600">
-          Supported formats: JPG, PNG, WebP (max 5MB). Ensure the label is clear and well-lit.
+          {t('medications.uploadInfo')}
         </p>
       </div>
     </Card>
