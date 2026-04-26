@@ -5,6 +5,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { webhookRouter } from "./webhookRouter";
 import { taskRouter } from "./taskRouter";
+import { contactsRouter } from "./contactsRouter";
 import { publicProcedure, protectedProcedure, router, apiKeyProcedure } from "./_core/trpc";
 import {
   getUserHubs,
@@ -41,6 +42,7 @@ export const appRouter = router({
   system: systemRouter,
   webhooks: webhookRouter,
   tasks: taskRouter,
+  contacts: contactsRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

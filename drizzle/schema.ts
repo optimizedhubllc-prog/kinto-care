@@ -449,3 +449,64 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+
+// ============================================================================
+// KINTO: Contacts (International Routing & Communication)
+// ============================================================================
+
+/**
+ * Contacts table: Manages hub contacts with international routing support.
+ * 
+ * Features:
+ * - Smart routing: US contacts use tel: links, international use WhatsApp + VoIP
+ * - Country-aware: Stores country_code for dynamic deep link generation
+ * - Language preferences: Supports multi-language communication
+ * - E.164 phone format: Ensures compatibility with tel: and WhatsApp deep links
+ * 
+ * Trust Pillar: Contains ONLY contact logistics information.
+ * NO clinical or diagnostic data stored here.
+ */
+export const contacts = mysqlTable("contacts", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  
+  // Hub association
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  
+  // Contact information
+  name: text("name").notNull(),
+  role: text("role").notNull(), // family_member, caregiver, medical_facility, pharmacy, other
+  phone: text("phone").notNull(), // E.164 format: +18095551234
+  
+  // International routing
+  countryCode: varchar("country_code", { length: 2 }).default("US").notNull(), // ISO 3166-1 alpha-2
+  languagePreference: varchar("language_preference", { length: 5 }).default("en").notNull(), // en, es, etc.
+  
+  // Notes for context
+  notes: text("notes"),
+  
+  // Audit trail
+  createdBy: int("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type Contact = typeof contacts.$inferSelect;
+export type InsertContact = typeof contacts.$inferInsert;
+
+/**
+ * Contacts Relations
+ */
+export const contactsRelations = relations(contacts, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [contacts.hubId],
+    references: [patientHubs.id],
+  }),
+  creator: one(users, {
+    fields: [contacts.createdBy],
+    references: [users.id],
+  }),
+}));
