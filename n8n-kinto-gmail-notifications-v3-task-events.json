@@ -1,0 +1,657 @@
+{
+  "name": "Kinto Gmail Notifications (v3 - Task Events)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "kinto-notifications",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonData": "={\n  \"eventType\": $json.event_type,\n  \"taskId\": $json.task_id,\n  \"taskTitle\": $json.task_title,\n  \"timestamp\": $json.timestamp,\n  \"hubId\": $json.hub_id,\n  \"priority\": $json.priority,\n  \"assignedTo\": $json.assigned_to,\n  \"oldStatus\": $json.old_status,\n  \"newStatus\": $json.new_status\n}"
+      },
+      "id": "extract-payload",
+      "name": "Extract Payload",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        450,
+        300
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "event-router",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "value1": "={{ $json.eventType }}",
+              "value2": "task.created",
+              "operation": "equals"
+            },
+            {
+              "value1": "={{ $json.eventType }}",
+              "value2": "task.assigned",
+              "operation": "equals"
+            },
+            {
+              "value1": "={{ $json.eventType }}",
+              "value2": "task.updated",
+              "operation": "equals"
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "event-router",
+      "name": "Event Router",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        650,
+        300
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "task-created-check",
+              "index": 0,
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "node": "task-assigned-check",
+              "index": 0,
+              "type": "main"
+            }
+          ],
+          [
+            {
+              "node": "task-updated-check",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "value1": "={{ $json.eventType }}",
+              "value2": "task.created",
+              "operation": "equals"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "task-created-check",
+      "name": "task.created Branch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        850,
+        100
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "created-get-assigned-user",
+              "index": 0,
+              "type": "main"
+            }
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "value1": "={{ $json.eventType }}",
+              "value2": "task.assigned",
+              "operation": "equals"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "task-assigned-check",
+      "name": "task.assigned Branch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        850,
+        300
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "assigned-get-user",
+              "index": 0,
+              "type": "main"
+            }
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "value1": "={{ $json.eventType }}",
+              "value2": "task.updated",
+              "operation": "equals"
+            },
+            {
+              "value1": "={{ $json.newStatus }}",
+              "value2": "completed",
+              "operation": "equals"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "task-updated-check",
+      "name": "task.updated (completed) Branch",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        850,
+        500
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "completed-get-all-users",
+              "index": 0,
+              "type": "main"
+            }
+          ],
+          []
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{ $env.KINTO_API_HOST }}/api/trpc/users.getByRoleWithApiKey",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.KINTO_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "input",
+              "value": "={\n  \"roleFilter\": [\"family_admin\", \"family_viewer\", \"caregiver\"]\n}"
+            }
+          ]
+        }
+      },
+      "id": "created-get-assigned-user",
+      "name": "Get Assigned User (task.created)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1050,
+        100
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "created-filter-user",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{ $env.KINTO_API_HOST }}/api/trpc/users.getByRoleWithApiKey",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.KINTO_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "input",
+              "value": "={\n  \"roleFilter\": [\"family_admin\", \"family_viewer\", \"caregiver\"]\n}"
+            }
+          ]
+        }
+      },
+      "id": "assigned-get-user",
+      "name": "Get Assigned User (task.assigned)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1050,
+        300
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "assigned-filter-user",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://{{ $env.KINTO_API_HOST }}/api/trpc/users.getByRoleWithApiKey",
+        "authentication": "genericCredentialType",
+        "genericCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.KINTO_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "input",
+              "value": "={\n  \"roleFilter\": [\"family_admin\", \"family_viewer\", \"caregiver\"]\n}"
+            }
+          ]
+        }
+      },
+      "id": "completed-get-all-users",
+      "name": "Get All Users (task.updated completed)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1050,
+        500
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "completed-prepare-recipients",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonData": "={\n  \"recipient\": $json.result.users.find(u => u.id === $json.assignedTo)\n}"
+      },
+      "id": "created-filter-user",
+      "name": "Filter Assigned User (created)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1250,
+        100
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "created-send-email",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonData": "={\n  \"recipient\": $json.result.users.find(u => u.id === $json.assignedTo)\n}"
+      },
+      "id": "assigned-filter-user",
+      "name": "Filter Assigned User (assigned)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1250,
+        300
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "assigned-send-email",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonData": "={\n  \"recipients\": $json.result.users\n}"
+      },
+      "id": "completed-prepare-recipients",
+      "name": "Prepare All Recipients (completed)",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1250,
+        500
+      ],
+      "connections": {
+        "main": [
+          [
+            {
+              "node": "completed-send-emails",
+              "index": 0,
+              "type": "main"
+            }
+          ]
+        ]
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "{{ $env.KINTO_SENDER_EMAIL }}",
+        "toEmail": "={{ $json.recipient?.email }}",
+        "subject": "=New Task: {{ $json.taskTitle }}",
+        "textOnly": true,
+        "text": "=Hi {{ $json.recipient?.name }},\n\nYou have been assigned a new task in Kinto Care:\n\nTask: {{ $json.taskTitle }}\nPriority: {{ $json.priority }}\nCreated: {{ $json.timestamp }}\n\nPlease log in to Kinto Care to view details and update the status.\n\n---\nKinto Care is a logistics and data coordination tool. No medical diagnosis provided.",
+        "credentialsType": "YOUR_LLC_GMAIL_CREDENTIAL_ID"
+      },
+      "id": "created-send-email",
+      "name": "Send task.created Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "{{ $env.KINTO_SENDER_EMAIL }}",
+        "toEmail": "={{ $json.recipient?.email }}",
+        "subject": "=Task Reassigned: {{ $json.taskTitle }}",
+        "textOnly": true,
+        "text": "=Hi {{ $json.recipient?.name }},\n\nA task has been assigned to you in Kinto Care:\n\nTask: {{ $json.taskTitle }}\nAssigned: {{ $json.timestamp }}\n\nPlease log in to Kinto Care to view details and begin working on this task.\n\n---\nKinto Care is a logistics and data coordination tool. No medical diagnosis provided.",
+        "credentialsType": "YOUR_LLC_GMAIL_CREDENTIAL_ID"
+      },
+      "id": "assigned-send-email",
+      "name": "Send task.assigned Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "{{ $env.KINTO_SENDER_EMAIL }}",
+        "toEmail": "={{ $json.recipients.map(r => r.email).join(',') }}",
+        "subject": "=Task Completed: {{ $json.taskTitle }}",
+        "textOnly": true,
+        "text": "=Hi Team,\n\nA task has been marked as completed in Kinto Care:\n\nTask: {{ $json.taskTitle }}\nCompleted: {{ $json.timestamp }}\n\nLog in to Kinto Care to review the completed task.\n\n---\nKinto Care is a logistics and data coordination tool. No medical diagnosis provided.",
+        "credentialsType": "YOUR_LLC_GMAIL_CREDENTIAL_ID"
+      },
+      "id": "completed-send-emails",
+      "name": "Send task.updated (completed) Emails",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "webhook-trigger": {
+      "main": [
+        [
+          {
+            "node": "extract-payload",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "extract-payload": {
+      "main": [
+        [
+          {
+            "node": "event-router",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "event-router": {
+      "main": [
+        [
+          {
+            "node": "task-created-check",
+            "index": 0,
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "node": "task-assigned-check",
+            "index": 0,
+            "type": "main"
+          }
+        ],
+        [
+          {
+            "node": "task-updated-check",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "task-created-check": {
+      "main": [
+        [
+          {
+            "node": "created-get-assigned-user",
+            "index": 0,
+            "type": "main"
+          }
+        ],
+        []
+      ]
+    },
+    "task-assigned-check": {
+      "main": [
+        [
+          {
+            "node": "assigned-get-user",
+            "index": 0,
+            "type": "main"
+          }
+        ],
+        []
+      ]
+    },
+    "task-updated-check": {
+      "main": [
+        [
+          {
+            "node": "completed-get-all-users",
+            "index": 0,
+            "type": "main"
+          }
+        ],
+        []
+      ]
+    },
+    "created-get-assigned-user": {
+      "main": [
+        [
+          {
+            "node": "created-filter-user",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "assigned-get-user": {
+      "main": [
+        [
+          {
+            "node": "assigned-filter-user",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "completed-get-all-users": {
+      "main": [
+        [
+          {
+            "node": "completed-prepare-recipients",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "created-filter-user": {
+      "main": [
+        [
+          {
+            "node": "created-send-email",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "assigned-filter-user": {
+      "main": [
+        [
+          {
+            "node": "assigned-send-email",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "completed-prepare-recipients": {
+      "main": [
+        [
+          {
+            "node": "completed-send-emails",
+            "index": 0,
+            "type": "main"
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3",
+  "meta": {
+    "instanceId": "placeholder",
+    "templateId": "kinto-gmail-notifications-v3-task-events"
+  },
+  "pinData": {},
+  "tags": [
+    "kinto",
+    "notifications",
+    "gmail",
+    "api-key",
+    "task-management"
+  ],
+  "notes": "Kinto Gmail Notification Workflow (v3 - Task Events)\n\n**VERSION 3 UPDATES:**\nThis workflow handles the three new task management events:\n- task.created: Send email to assigned user\n- task.assigned: Send email to newly assigned user\n- task.updated (status: completed): Send email to all team members\n\n**KEY FEATURES:**\n- Plain text emails (not HTML) for accessibility\n- Compliance footer on all emails\n- Role-based recipient filtering\n- Separate branches for each event type\n- Uses API key authentication (Bearer token)\n\n**EVENT ROUTING:**\n1. Webhook Trigger receives event from Kinto EventBus\n2. Extract Payload parses event fields (eventType, taskId, taskTitle, etc.)\n3. Event Router branches to specific event handlers:\n   - task.created → Get assigned user → Send notification\n   - task.assigned → Get assigned user → Send notification\n   - task.updated (completed) → Get all users → Send broadcast\n\n**WEBHOOK PAYLOAD FORMAT (v3):**\n{\n  \"hub_id\": \"uuid\",\n  \"event_type\": \"task.created|task.assigned|task.updated\",\n  \"task_id\": \"uuid\",\n  \"task_title\": \"string\",\n  \"assigned_to\": \"number (user ID) | null\",\n  \"priority\": \"low|medium|high\",\n  \"old_status\": \"pending|in_progress|completed\" (only for task.updated),\n  \"new_status\": \"pending|in_progress|completed\" (only for task.updated),\n  \"timestamp\": \"ISO 8601 datetime\"\n}\n\n**SETUP INSTRUCTIONS:**\n1. Generate API key: node scripts/generate-n8n-api-key.mjs <HUB_ID> 1\n2. Set n8n environment variables:\n   - KINTO_API_KEY: Your generated API key\n   - KINTO_API_HOST: Your Kinto host (e.g., kinto.example.com)\n   - KINTO_SENDER_EMAIL: Sender email address\n3. Replace 'YOUR_LLC_GMAIL_CREDENTIAL_ID' with your actual Gmail credential ID\n4. Import this workflow into n8n cloud\n5. Test with sample task events\n6. Activate the workflow\n\n**ENVIRONMENT VARIABLES REQUIRED:**\n- KINTO_API_KEY: API key for authentication (Bearer token)\n- KINTO_API_HOST: Kinto API host URL\n- KINTO_SENDER_EMAIL: Email address to send from\n\n**ENDPOINT DETAILS:**\nURL: https://{{ $env.KINTO_API_HOST }}/api/trpc/users.getByRoleWithApiKey\nMethod: POST\nAuth: Bearer {{ $env.KINTO_API_KEY }}\nPermissions: users:read\n\n**EMAIL TEMPLATES:**\nAll emails use plain text format with compliance footer:\n\"Kinto Care is a logistics and data coordination tool. No medical diagnosis provided.\"\n\n**DOCUMENTATION:**\nSee TASK_WEBHOOK_PAYLOADS.md for complete payload documentation.\nSee API_KEY_N8N_SETUP.md for API key setup guide.\n\n**MIGRATION FROM V2:**\nV2 handled generic broadcast events (task.created, task.claimed, task.completed).\nV3 handles specific task management events with proper routing:\n- task.created: New task notification\n- task.assigned: Task assignment notification\n- task.updated: Status change notification (completed only)\n\nReplace the v2 workflow with this v3 workflow in n8n."
+}
