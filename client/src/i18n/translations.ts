@@ -38,7 +38,7 @@ export const translations = {
 
     // Tasks
     tasks: {
-      title: "Tasks",
+      title: "Care Tasks",
       myTasks: "My Tasks",
       newTask: "+ New Task",
       scanLabel: "Scan Label",
@@ -73,6 +73,13 @@ export const translations = {
       dueTomorrow: "Due tomorrow",
       dueIn: "Due in",
       days: "days",
+      manageAllTasks: "Manage all family care tasks",
+      viewAssignedTasks: "View and update your assigned tasks",
+      notAuthenticated: "Not authenticated",
+      pleaseLogin: "Please log in to view tasks.",
+      noTasksFound: "No tasks found",
+      selectAssignee: "Select assignee",
+      taskCreatedSuccess: "Task created successfully",
     },
 
     // Medications
@@ -188,7 +195,7 @@ export const translations = {
 
     // Tasks
     tasks: {
-      title: "Tareas",
+      title: "Mis Tareas",
       myTasks: "Mis Tareas",
       newTask: "+ Nueva Tarea",
       scanLabel: "Escanear Etiqueta",
@@ -223,6 +230,13 @@ export const translations = {
       dueTomorrow: "Vence mañana",
       dueIn: "Vence en",
       days: "días",
+      manageAllTasks: "Gestionar todas las tareas de cuidado familiar",
+      viewAssignedTasks: "Ver y actualizar tus tareas asignadas",
+      notAuthenticated: "No autenticado",
+      pleaseLogin: "Por favor inicia sesión para ver tareas.",
+      noTasksFound: "No se encontraron tareas",
+      selectAssignee: "Seleccionar asignado",
+      taskCreatedSuccess: "Tarea creada exitosamente",
     },
 
     // Medications
