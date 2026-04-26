@@ -80,6 +80,9 @@ export const translations = {
       noTasksFound: "No tasks found",
       selectAssignee: "Select assignee",
       taskCreatedSuccess: "Task created successfully",
+      by: "by",
+      day: "day",
+      due: "Due",
     },
 
     // Medications
@@ -237,6 +240,9 @@ export const translations = {
       noTasksFound: "No se encontraron tareas",
       selectAssignee: "Seleccionar asignado",
       taskCreatedSuccess: "Tarea creada exitosamente",
+      by: "por",
+      day: "día",
+      due: "Vence",
     },
 
     // Medications

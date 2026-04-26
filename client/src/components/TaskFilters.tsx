@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import React, { useState } from "react";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export interface TaskFiltersProps {
   status?: "pending" | "in_progress" | "completed" | "all";
@@ -34,39 +35,40 @@ export function TaskFilters({
   showUnassignedFilter = false,
   users = [],
 }: TaskFiltersProps) {
+  const { t } = useTranslation();
   return (
     <div className="space-y-3 p-4 bg-white border-b border-gray-200">
-      <h3 className="text-sm font-semibold text-gray-900">Filters</h3>
+      <h3 className="text-sm font-semibold text-gray-900">{t('common.filters')}</h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {/* Status Filter */}
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-700">Status</label>
+          <label className="text-xs font-medium text-gray-700">{t('tasks.status')}</label>
           <Select value={status} onValueChange={onStatusChange}>
             <SelectTrigger className="h-8 text-xs bg-gray-50 border-gray-200">
-              <SelectValue placeholder="All statuses" />
+              <SelectValue placeholder={t('tasks.allStatuses')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
+              <SelectItem value="all">{t('tasks.allStatuses')}</SelectItem>
+              <SelectItem value="pending">{t('tasks.pending')}</SelectItem>
+              <SelectItem value="in_progress">{t('tasks.inProgress')}</SelectItem>
+              <SelectItem value="completed">{t('tasks.completed')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {/* Priority Filter */}
         <div className="space-y-1">
-          <label className="text-xs font-medium text-gray-700">Priority</label>
+          <label className="text-xs font-medium text-gray-700">{t('tasks.priority')}</label>
           <Select value={priority} onValueChange={onPriorityChange}>
             <SelectTrigger className="h-8 text-xs bg-gray-50 border-gray-200">
-              <SelectValue placeholder="All priorities" />
+              <SelectValue placeholder={t('tasks.allPriorities')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Priorities</SelectItem>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="all">{t('tasks.allPriorities')}</SelectItem>
+              <SelectItem value="low">{t('tasks.low')}</SelectItem>
+              <SelectItem value="medium">{t('tasks.medium')}</SelectItem>
+              <SelectItem value="high">{t('tasks.high')}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -74,14 +76,14 @@ export function TaskFilters({
         {/* Assigned To Filter */}
         {(showUnassignedFilter || users.length > 0) && (
           <div className="space-y-1">
-            <label className="text-xs font-medium text-gray-700">Assigned To</label>
+            <label className="text-xs font-medium text-gray-700">{t('tasks.assignedTo')}</label>
             <Select value={assignedTo?.toString() || "all"} onValueChange={onAssignedToChange}>
               <SelectTrigger className="h-8 text-xs bg-gray-50 border-gray-200">
-                <SelectValue placeholder="All assignments" />
+                <SelectValue placeholder={t('tasks.allAssignments')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Assignments</SelectItem>
-                {showUnassignedFilter && <SelectItem value="unassigned">Unassigned</SelectItem>}
+                <SelectItem value="all">{t('tasks.allAssignments')}</SelectItem>
+                {showUnassignedFilter && <SelectItem value="unassigned">{t('tasks.unassigned')}</SelectItem>}
                 {users.map((user) => (
                   <SelectItem key={user.id} value={user.id.toString()}>
                     {user.name}

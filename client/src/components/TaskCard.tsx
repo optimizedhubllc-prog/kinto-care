@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { TaskCompletionConfirmDialog } from "@/components/TaskCompletionConfirmDialog";
 import { format, formatDistance, isPast, parseISO } from "date-fns";
 import React, { useState } from "react";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 export interface TaskCardProps {
   id: string;
@@ -45,6 +46,7 @@ export function TaskCard({
   onStatusChange,
   isUpdating = false,
 }: TaskCardProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -57,9 +59,9 @@ export function TaskCard({
       const now = new Date();
       if (isPast(date) && status !== "completed") {
         const daysOverdue = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-        return `Overdue by ${daysOverdue} day${daysOverdue !== 1 ? "s" : ""}`;
+        return `${t('tasks.overdue')} ${t('tasks.by')} ${daysOverdue} ${daysOverdue !== 1 ? t('tasks.days') : t('tasks.day')}`;
       }
-      return `Due ${formatDistance(date, now, { addSuffix: true })}`;
+      return `${t('tasks.due')} ${formatDistance(date, now, { addSuffix: true })}`;
     } catch {
       return format(parseISO(dueDate), "MMM d, yyyy");
     }
@@ -90,11 +92,11 @@ export function TaskCard({
   const getStatusLabel = () => {
     switch (status) {
       case "completed":
-        return "Completed";
+        return t('tasks.completed');
       case "in_progress":
-        return "In Progress";
+        return t('tasks.inProgress');
       case "pending":
-        return "Pending";
+        return t('tasks.pending');
     }
   };
 
@@ -130,7 +132,7 @@ export function TaskCard({
             {title}
           </h3>
           <Badge variant="outline" className={`shrink-0 text-xs font-medium ${getPriorityColor()}`}>
-            {priority.charAt(0).toUpperCase() + priority.slice(1)}
+            {t(`tasks.${priority}`)}
           </Badge>
         </div>
 
@@ -173,12 +175,12 @@ export function TaskCard({
                 disabled={isUpdating}
                 className="w-full h-8 text-xs sm:text-sm bg-teal-50 border-teal-200 text-teal-900 hover:bg-teal-100"
               >
-                <SelectValue placeholder="Update status" />
+                <SelectValue placeholder={t('tasks.status')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="pending">{t('tasks.pending')}</SelectItem>
+                <SelectItem value="in_progress">{t('tasks.inProgress')}</SelectItem>
+                <SelectItem value="completed">{t('tasks.completed')}</SelectItem>
               </SelectContent>
             </Select>
           </div>

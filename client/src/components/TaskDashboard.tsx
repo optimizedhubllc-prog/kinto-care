@@ -6,6 +6,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { AlertCircle, CheckCircle2, Clock, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 /**
  * TaskDashboard Component
@@ -29,6 +30,7 @@ import React, { useMemo, useState, useEffect, useCallback, useRef } from "react"
  */
 export function TaskDashboard() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState<"pending" | "in_progress" | "completed" | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<"low" | "medium" | "high" | "all">("all");
   const [assignedToFilter, setAssignedToFilter] = useState<number | "unassigned" | "all">("all");
@@ -148,8 +150,8 @@ export function TaskDashboard() {
       <div className="flex items-center justify-center h-screen bg-linen">
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-600 mx-auto mb-4" />
-          <p className="text-gray-900 font-semibold">Not authenticated</p>
-          <p className="text-gray-600 text-sm">Please log in to view tasks.</p>
+          <p className="text-gray-900 font-semibold">{t('tasks.notAuthenticated')}</p>
+          <p className="text-gray-600 text-sm">{t('tasks.pleaseLogin')}</p>
         </div>
       </div>
     );
@@ -163,11 +165,11 @@ export function TaskDashboard() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <h1 className="text-2xl sm:text-3xl font-bold text-navy font-playfair">
-                Care Tasks
+                {t('tasks.title')}
               </h1>
               <p className="text-gray-600 text-sm mt-1">
-                {user?.role === "admin" && "Manage all family care tasks"}
-                {user?.role === "user" && "View and update your assigned tasks"}
+                {user?.role === "admin" && t('tasks.manageAllTasks')}
+                {user?.role === "user" && t('tasks.viewAssignedTasks')}
               </p>
             </div>
             <div className="flex gap-2">
@@ -177,7 +179,7 @@ export function TaskDashboard() {
                   className="bg-teal-600 hover:bg-teal-700 text-white h-10 px-4 sm:px-6 whitespace-nowrap"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">New Task</span>
+                  <span className="hidden sm:inline">{t('tasks.newTask')}</span>
                   <span className="sm:hidden">+</span>
                 </Button>
               )}
