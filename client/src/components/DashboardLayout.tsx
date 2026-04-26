@@ -21,16 +21,18 @@ import {
 } from "@/components/ui/sidebar";
 import { getLoginUrl } from "@/const";
 import { useIsMobile } from "@/hooks/useMobile";
+import { useTranslation } from "@/contexts/LanguageContext";
 import { LayoutDashboard, LogOut, PanelLeft, Users, Phone } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
-const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-  { icon: Users, label: "Tasks", path: "/tasks" },
-  { icon: Phone, label: "Contacts", path: "/contacts" },
+// Menu items - will be filtered based on user role
+const allMenuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/", key: "nav.dashboard" },
+  { icon: Users, label: "Tasks", path: "/tasks", key: "nav.tasks" },
+  { icon: Phone, label: "Contacts", path: "/contacts", key: "nav.contacts" },
 ];
 
 const SIDEBAR_WIDTH_KEY = "sidebar-width";
@@ -48,6 +50,9 @@ export default function DashboardLayout({
     return saved ? parseInt(saved, 10) : DEFAULT_WIDTH;
   });
   const { loading, user } = useAuth();
+  const { t, language } = useTranslation();
+
+
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -108,12 +113,25 @@ function DashboardLayoutContent({
   setSidebarWidth,
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
+  const { t, language } = useTranslation();
   const [location, setLocation] = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const activeMenuItem = menuItems.find(item => item.path === location);
+  
+  // Filter menu items for caregiver role
+  const getMenuItems = () => {
+    if (user?.role === "caregiver" && language === "es") {
+      return allMenuItems.filter((item: any) => 
+        item.path === "/" || item.path === "/tasks" || item.path === "/contacts"
+      );
+    }
+    return allMenuItems;
+  };
+  
+  const menuItems = getMenuItems();
+  const activeMenuItem = menuItems.find((item: any) => item.path === location);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -184,7 +202,7 @@ function DashboardLayoutContent({
 
           <SidebarContent className="gap-0">
             <SidebarMenu className="px-2 py-1">
-              {menuItems.map(item => {
+              {menuItems.map((item: any) => {
                 const isActive = location === item.path;
                 return (
                   <SidebarMenuItem key={item.path}>
