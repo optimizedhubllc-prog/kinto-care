@@ -45,6 +45,34 @@ export const appRouter = router({
   contacts: contactsRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
+    
+    login: publicProcedure
+      .input(
+        z.object({
+          email: z.string().email(),
+          password: z.string().min(1),
+        })
+      )
+      .mutation(async ({ input, ctx }) => {
+        // TODO: Implement Supabase Auth login
+        // For now, return mock user for testing
+        const mockUser = {
+          id: 1,
+          email: input.email,
+          name: "Test User",
+          role: "user" as const,
+          hubMemberRole: "family_admin",
+          hubId: "test-hub-id",
+          languagePreference: "en",
+          openId: "mock-open-id",
+          loginMethod: "email",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          lastSignedIn: new Date(),
+        };
+        return { user: mockUser };
+      }),
+    
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });

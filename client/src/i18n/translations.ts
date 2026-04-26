@@ -222,6 +222,21 @@ export const translations = {
       languagePreference: "Language Preference",
     },
 
+    // Authentication
+    auth: {
+      signIn: "Sign In",
+      email: "Email",
+      password: "Password",
+      careHub: "Care Hub",
+      enterCredentials: "Enter your email and password",
+      invalidCredentials: "Invalid email or password",
+      requiredFields: "Email and password are required",
+      forgotPassword: "Forgot password?",
+      trustPillar: "Kinto Care protects your family's care data",
+      signedOutSuccessfully: "Signed out successfully",
+      accessDenied: "Access denied",
+    },
+
     // Common
     common: {
       save: "Save",
@@ -460,6 +475,21 @@ export const translations = {
       routingDoWhatsapp: "Este contacto recibirá WhatsApp como acción principal + opción de llamada",
       routingIntlWhatsapp: "Este contacto recibirá WhatsApp + opciones de llamada",
       languagePreference: "Preferencia de Idioma",
+    },
+
+    // Authentication
+    auth: {
+      signIn: "Iniciar Sesión",
+      email: "Correo Electrónico",
+      password: "Contraseña",
+      careHub: "Centro de Cuidados",
+      enterCredentials: "Ingresa tu correo y contraseña",
+      invalidCredentials: "Correo o contraseña inválidos",
+      requiredFields: "El correo y la contraseña son requeridos",
+      forgotPassword: "¿Olvidaste tu contraseña?",
+      trustPillar: "Kinto Care protege los datos de cuidado de tu familia",
+      signedOutSuccessfully: "Sesión cerrada exitosamente",
+      accessDenied: "Acceso denegado",
     },
 
     // Common

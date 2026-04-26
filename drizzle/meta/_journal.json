@@ -71,6 +71,13 @@
       "when": 1777239576734,
       "tag": "0009_happy_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1777243509582,
+      "tag": "0010_busy_franklin_storm",
+      "breakpoints": true
     }
   ]
 }

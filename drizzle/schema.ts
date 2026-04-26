@@ -20,6 +20,12 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }).unique(),
   loginMethod: varchar("loginMethod", { length: 64 }),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  /** Hub member role for Kinto Care (family_admin, family_member, caregiver) */
+  hubMemberRole: varchar("hub_member_role", { length: 32 }).default("family_member"),
+  /** Primary hub ID for this user */
+  hubId: varchar("hub_id", { length: 36 }),
+  /** User's language preference (en, es, etc.) */
+  languagePreference: varchar("language_preference", { length: 5 }).default("en").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
