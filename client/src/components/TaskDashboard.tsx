@@ -1,9 +1,11 @@
 import { TaskCard } from "@/components/TaskCard";
 import { TaskFilters } from "@/components/TaskFilters";
+import { TaskCreateModal } from "@/components/TaskCreateModal";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { AlertCircle, CheckCircle2, Clock, Loader2 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import { AlertCircle, CheckCircle2, Clock, Loader2, Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
 
 /**
  * TaskDashboard Component
@@ -30,6 +32,7 @@ export function TaskDashboard() {
   const [statusFilter, setStatusFilter] = useState<"pending" | "in_progress" | "completed" | "all">("all");
   const [priorityFilter, setPriorityFilter] = useState<"low" | "medium" | "high" | "all">("all");
   const [assignedToFilter, setAssignedToFilter] = useState<number | "unassigned" | "all">("all");
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Use hardcoded hub ID from seeded Jaquez family hub
   const JAQUEZ_HUB_ID = "d7dd12a1-ed80-4429-96fd-cf5d7fc16c0e";
@@ -56,7 +59,7 @@ export function TaskDashboard() {
     },
   });
 
-  // Get all users for the assigned to filter
+  // Get all users for the assigned to filter and modal
   const { data: allUsers } = trpc.users.getByRoleWithApiKey.useQuery(
     {
       roleFilter: ["family_admin", "family_member", "caregiver"],
@@ -65,6 +68,16 @@ export function TaskDashboard() {
       enabled: user?.role === "admin",
     }
   );
+
+  // Real-time sync: Auto-refresh task list periodically
+  // In production, this would use tRPC subscriptions via EventBus
+  // For now, we rely on mutation.onSuccess and manual invalidation
+  useEffect(() => {
+    const interval = setInterval(() => {
+      trpc.useUtils().tasks.list.invalidate();
+    }, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
 
   // Filter tasks by priority and assigned user
   const filteredTasks = useMemo(() => {
@@ -132,13 +145,27 @@ export function TaskDashboard() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 sm:py-6">
-          <h1 className="text-2xl sm:text-3xl font-bold text-navy font-playfair">
-            Care Tasks
-          </h1>
-          <p className="text-gray-600 text-sm mt-1">
-            {user?.role === "admin" && "Manage all family care tasks"}
-            {user?.role === "user" && "View and update your assigned tasks"}
-          </p>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1">
+              <h1 className="text-2xl sm:text-3xl font-bold text-navy font-playfair">
+                Care Tasks
+              </h1>
+              <p className="text-gray-600 text-sm mt-1">
+                {user?.role === "admin" && "Manage all family care tasks"}
+                {user?.role === "user" && "View and update your assigned tasks"}
+              </p>
+            </div>
+            {(user?.role === "admin" || user?.role === "user") && (
+              <Button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="bg-teal-600 hover:bg-teal-700 text-white h-10 px-4 sm:px-6 whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                <span className="hidden sm:inline">New Task</span>
+                <span className="sm:hidden">+</span>
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -279,6 +306,18 @@ export function TaskDashboard() {
           <p>Kinto Care is a logistics and data coordination tool. No medical diagnosis provided.</p>
         </div>
       </div>
+
+      {/* Task Creation Modal */}
+      <TaskCreateModal
+        open={isCreateModalOpen}
+        onOpenChange={setIsCreateModalOpen}
+        hubId={JAQUEZ_HUB_ID}
+        onTaskCreated={() => {
+          // Refresh task list after creation
+          trpc.useUtils().tasks.list.invalidate();
+        }}
+        users={(allUsers?.users || []).map((u: any) => ({ id: u.id, name: u.name || "Unknown" }))}
+      />
     </div>
   );
 }
