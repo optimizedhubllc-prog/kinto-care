@@ -57,7 +57,6 @@ async function main() {
       keyHash: hash,
       permissions: "users:read",
       createdBy,
-      createdAt: now,
       isActive: true,
     });
 
