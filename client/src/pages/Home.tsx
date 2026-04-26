@@ -46,9 +46,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Kinto Care Heart Logo */}
+              {/* Kinto Care Heart Logo - SOP v1.2 */}
               <img 
-                src="https://d2xsxph8kpxj0f.cloudfront.net/310519663129010374/QJ3E2r9gCPZv4t7YHdCX6w/kinto-care-logo-9tzWLkBeKrJxhgw9C44J27.webp" 
+                src="https://d2xsxph8kpxj0f.cloudfront.net/310519663129010374/QJ3E2r9gCPZv4t7YHdCX6w/kinto-care-logo-sop-v1.2-axWCEe4rP9rfBvTTQ26hhN.webp" 
                 alt="Kinto Care" 
                 className="h-10 w-auto"
               />

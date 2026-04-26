@@ -170,9 +170,9 @@ function DashboardLayoutContent({
               </button>
               {!isCollapsed ? (
                 <div className="flex items-center gap-2 min-w-0">
-                  {/* Kinto Care Heart Logo */}
+                  {/* Kinto Care Heart Logo - SOP v1.2 */}
                   <img 
-                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663129010374/QJ3E2r9gCPZv4t7YHdCX6w/kinto-care-logo-9tzWLkBeKrJxhgw9C44J27.webp" 
+                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663129010374/QJ3E2r9gCPZv4t7YHdCX6w/kinto-care-logo-sop-v1.2-axWCEe4rP9rfBvTTQ26hhN.webp" 
                     alt="Kinto Care" 
                     className="h-8 w-auto"
                   />
