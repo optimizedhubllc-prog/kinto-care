@@ -1,6 +1,7 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 /**
  * ContactCard Component
@@ -44,6 +45,7 @@ export function ContactCard({
   countryFlag,
   whatsappUrl,
 }: ContactCardProps) {
+  const { t } = useTranslation();
   // Format phone for display (remove +1 for US numbers)
   const displayPhone = countryCode === "US" && phone.startsWith("+1") 
     ? phone.slice(2) 
@@ -89,7 +91,7 @@ export function ContactCard({
       <div className="flex gap-2 mb-3">
         {isInternational && (
           <Badge className="bg-teal-100 text-teal-800 text-xs">
-            International
+            {t('contacts.international')}
           </Badge>
         )}
         {languagePreference === "es" && (
@@ -124,13 +126,13 @@ export function ContactCard({
                       : "bg-teal-600 hover:bg-teal-700"
                   } text-white`}
                 >
-                  {isDominicanRepublic ? "WhatsApp" : "Message"}
+                  {isDominicanRepublic ? t('contacts.whatsapp') : t('contacts.message')}
                 </Button>
               </a>
             )}
             <a href={`tel:${phone}`} className="flex-1">
               <Button size="sm" variant="outline" className="w-full">
-                Call
+                {t('contacts.call')}
               </Button>
             </a>
           </>
@@ -139,7 +141,7 @@ export function ContactCard({
             {/* US: Call Only */}
             <a href={`tel:${phone}`} className="flex-1">
               <Button size="sm" className="w-full bg-teal-600 hover:bg-teal-700 text-white">
-                Call
+                {t('contacts.call')}
               </Button>
             </a>
           </>

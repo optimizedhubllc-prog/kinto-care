@@ -4,6 +4,7 @@ import { ContactCard } from "@/components/ContactCard";
 import { AddContactModal } from "@/components/AddContactModal";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
+import { useTranslation } from "@/contexts/LanguageContext";
 
 /**
  * ContactsPage Component
@@ -23,6 +24,7 @@ import { trpc } from "@/lib/trpc";
 const HUB_ID = "d7dd12a1-ed80-4429-96fd-cf5d7fc16c0e"; // Jaquez family hub
 
 export function ContactsPage() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [showAddModal, setShowAddModal] = useState(false);
 
@@ -61,7 +63,7 @@ export function ContactsPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <p className="text-gray-500">Loading contacts...</p>
+        <p className="text-gray-500">{t('common.loading')}</p>
       </div>
     );
   }
@@ -71,13 +73,13 @@ export function ContactsPage() {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-navy-900">Contacts</h1>
+          <h1 className="text-2xl font-bold text-navy-900">{t('contacts.title')}</h1>
           {isFamilyAdmin && (
             <Button
               onClick={() => setShowAddModal(true)}
               className="bg-teal-600 hover:bg-teal-700 text-white"
             >
-              + Add Contact
+              + {t('contacts.addContact')}
             </Button>
           )}
         </div>
@@ -87,7 +89,7 @@ export function ContactsPage() {
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
         {/* Family Members Section */}
         <section>
-          <h2 className="text-lg font-semibold text-navy-900 mb-4">Family Members</h2>
+          <h2 className="text-lg font-semibold text-navy-900 mb-4">{t('contacts.familyMembers')}</h2>
           {sortedFamilyContacts.length > 0 ? (
             <div className="space-y-3">
               {sortedFamilyContacts.map(contact => (
@@ -96,7 +98,7 @@ export function ContactsPage() {
             </div>
           ) : (
             <div className="p-6 bg-gray-50 rounded-lg text-center">
-              <p className="text-gray-500">No family members added yet</p>
+              <p className="text-gray-500">{t('contacts.noFamilyMembers')}</p>
             </div>
           )}
         </section>
@@ -104,7 +106,7 @@ export function ContactsPage() {
         {/* Caregivers & External Contacts Section */}
         <section>
           <h2 className="text-lg font-semibold text-navy-900 mb-4">
-            Caregivers & Contacts
+            {t('contacts.caregiversAndContacts')}
           </h2>
           {sortedCaregiverContacts.length > 0 ? (
             <div className="space-y-3">
@@ -114,14 +116,14 @@ export function ContactsPage() {
             </div>
           ) : (
             <div className="p-6 bg-gray-50 rounded-lg text-center">
-              <p className="text-gray-500">No caregivers or contacts added yet</p>
+              <p className="text-gray-500">{t('contacts.noCaregivers')}</p>
               {isFamilyAdmin && (
                 <Button
                   onClick={() => setShowAddModal(true)}
                   variant="outline"
                   className="mt-3"
                 >
-                  Add First Contact
+                  {t('contacts.addFirstContact')}
                 </Button>
               )}
             </div>
@@ -131,7 +133,7 @@ export function ContactsPage() {
 
       {/* Trust Pillar Footer */}
       <div className="mt-12 py-4 text-center text-xs text-gray-500 border-t border-gray-200">
-        <p>Kinto Care is a logistics and data coordination tool. No medical diagnosis provided.</p>
+        <p>{t('common.disclaimer')}</p>
       </div>
 
       {/* Add Contact Modal */}
