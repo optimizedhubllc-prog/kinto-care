@@ -4,6 +4,7 @@ import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { webhookRouter } from "./webhookRouter";
+import { taskRouter } from "./taskRouter";
 import { publicProcedure, protectedProcedure, router, apiKeyProcedure } from "./_core/trpc";
 import {
   getUserHubs,
@@ -39,6 +40,7 @@ import crypto from "crypto";
 export const appRouter = router({
   system: systemRouter,
   webhooks: webhookRouter,
+  tasks: taskRouter,
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
     logout: publicProcedure.mutation(({ ctx }) => {

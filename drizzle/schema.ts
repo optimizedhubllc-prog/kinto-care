@@ -343,3 +343,98 @@ export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+
+// ============================================================================
+// KINTO: Task Management (Logistics & Coordination)
+// ============================================================================
+
+/**
+ * Priority enum for tasks.
+ * - low: Non-urgent, can be scheduled flexibly
+ * - medium: Standard priority, should be completed soon
+ * - high: Urgent, requires immediate attention
+ */
+export const taskPriorityEnum = mysqlEnum("task_priority", [
+  "low",
+  "medium",
+  "high",
+]);
+
+/**
+ * Status enum for tasks.
+ * Valid transitions: pending → in_progress → completed
+ */
+export const taskStatusEnum = mysqlEnum("task_status", [
+  "pending",
+  "in_progress",
+  "completed",
+]);
+
+/**
+ * Tasks table: Manages care coordination tasks and assignments.
+ * 
+ * Trust Pillar: This table contains ONLY logistics and coordination data.
+ * NO diagnostic, clinical, or medical information is stored here.
+ * Examples of valid tasks:
+ * - "Schedule doctor appointment"
+ * - "Prepare medication for next week"
+ * - "Arrange transportation to clinic"
+ * - "Follow up with insurance"
+ * 
+ * Examples of INVALID tasks (never store these):
+ * - Diagnoses, symptoms, or clinical observations
+ * - Medication dosages or medical instructions
+ * - Patient health metrics or vital signs
+ */
+export const tasks = mysqlTable("tasks", {
+  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  
+  // Hub association: every task belongs to a hub
+  hubId: varchar("hub_id", { length: 36 })
+    .notNull()
+    .references(() => patientHubs.id, { onDelete: "cascade" }),
+  
+  // Task content
+  title: text("title").notNull(),
+  description: text("description"),
+  
+  // Task scheduling
+  dueDate: timestamp("due_date"),
+  
+  // Task assignment and ownership
+  assignedTo: int("assigned_to")
+    .references(() => users.id, { onDelete: "set null" }),
+  createdBy: int("created_by")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  
+  // Task state
+  priority: taskPriorityEnum.default("medium").notNull(),
+  status: taskStatusEnum.default("pending").notNull(),
+  
+  // Timestamps
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = typeof tasks.$inferInsert;
+
+/**
+ * Task Relations
+ */
+export const tasksRelations = relations(tasks, ({ one }) => ({
+  hub: one(patientHubs, {
+    fields: [tasks.hubId],
+    references: [patientHubs.id],
+  }),
+  assignee: one(users, {
+    fields: [tasks.assignedTo],
+    references: [users.id],
+  }),
+  creator: one(users, {
+    fields: [tasks.createdBy],
+    references: [users.id],
+  }),
+}));

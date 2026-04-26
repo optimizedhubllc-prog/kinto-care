@@ -50,6 +50,13 @@
       "when": 1777054358557,
       "tag": "0006_sleepy_nicolaos",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1777229348930,
+      "tag": "0007_wandering_oracle",
+      "breakpoints": true
     }
   ]
 }
