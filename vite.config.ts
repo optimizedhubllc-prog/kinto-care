@@ -170,6 +170,7 @@ export default defineConfig({
   },
   server: {
     host: true,
+    hmr: false,
     allowedHosts: [
       ".manuspre.computer",
       ".manus.computer",
@@ -181,7 +182,7 @@ export default defineConfig({
     ],
     fs: {
       strict: true,
-      deny: ["**/.*"],
+      deny: ["**/..*"],
     },
   },
 });
