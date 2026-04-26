@@ -8,22 +8,46 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
-import { toast } from "sonner";
-import { Loader2, Plus, Edit2, Trash2, Camera, CheckCircle } from "lucide-react";
+import { Loader2, Plus, Edit2, Trash2, Camera, CheckCircle, Phone } from "lucide-react";
 import { WebhookNotificationListener } from "@/components/WebhookNotificationListener";
+import { MedicationLabelUpload } from "@/components/MedicationLabelUpload";
+import { SeerResultCard } from "@/components/SeerResultCard";
+import { MedicationReviewModal } from "@/components/MedicationReviewModal";
 
+/**
+ * MedicationsPage - Complete Seer Engine Integration
+ * 
+ * Features:
+ * - Medications list with refill tracking
+ * - Scan Label button (OCR via Claude Vision API)
+ * - Extraction history with filtering (admin only)
+ * - Manual review workflow for low-confidence extractions
+ * - Real-time review queue badge
+ */
 export default function Medications() {
   const { user } = useAuth();
   const { hubId } = useParams() as { hubId: string };
+  
+  // UI State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({ name: "", dosage: "", frequency: "", instructions: "" });
   const [showCamera, setShowCamera] = useState(false);
   const [isScanningOCR, setIsScanningOCR] = useState(false);
   const [scannedData, setScannedData] = useState<any>(null);
+  
+  // Seer Engine State
+  const [activeTab, setActiveTab] = useState<"medications" | "history">("medications");
+  const [showReview, setShowReview] = useState(false);
+  const [selectedExtraction, setSelectedExtraction] = useState<any>(null);
+  const [extractionHistory, setExtractionHistory] = useState<any[]>([]);
+  const [confidenceFilter, setConfidenceFilter] = useState<"all" | "high" | "medium" | "low">("all");
+  const [reviewedFilter, setReviewedFilter] = useState<"all" | "reviewed" | "unreviewed">("all");
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  // tRPC Queries & Mutations
   const medicationsQuery = trpc.medications.list.useQuery({ hubId });
   const hubQuery = trpc.hubs.getById.useQuery({ hubId });
   const createMutation = trpc.medications.create.useMutation();
@@ -33,6 +57,9 @@ export default function Medications() {
 
   const hub = hubQuery.data;
   const isFamilyAdmin = hub?.members?.some(m => m.userId === user?.id && m.role === 'family_admin');
+  const isFamilyMember = hub?.members?.some(m => m.userId === user?.id && (m.role === 'family_admin' || m.role === 'family_viewer'));
+
+  // ============ Handlers ============
 
   const handleOpenDialog = (medication?: any) => {
     if (medication) {
@@ -62,7 +89,7 @@ export default function Medications() {
         setShowCamera(true);
       }
     } catch (error) {
-      toast.error("Failed to access camera");
+      alert("Failed to access camera");
     }
   };
 
@@ -93,18 +120,10 @@ export default function Medications() {
         imageBase64,
       });
 
-      setScannedData(result);
-      setFormData({
-        name: result.name || "",
-        dosage: result.dosage || "",
-        frequency: result.frequency || "",
-        instructions: result.instructions || "",
-      });
-
+      handleExtractResult(result);
       stopCamera();
-      toast.success("Medication label scanned successfully");
     } catch (error) {
-      toast.error("Failed to extract medication information from image");
+      alert("Failed to extract medication information from image");
     } finally {
       setIsScanningOCR(false);
     }
@@ -113,7 +132,7 @@ export default function Medications() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.name.trim()) {
-      toast.error("Medication name is required");
+      alert("Medication name is required");
       return;
     }
 
@@ -124,19 +143,19 @@ export default function Medications() {
           hubId,
           ...formData,
         });
-        toast.success("Medication updated");
+        alert("Medication updated");
       } else {
         await createMutation.mutateAsync({
           hubId,
           ...formData,
         });
-        toast.success("Medication added");
+        alert("Medication added");
       }
       setIsDialogOpen(false);
       setScannedData(null);
       medicationsQuery.refetch();
     } catch (error) {
-      toast.error("Failed to save medication");
+      alert("Failed to save medication");
     }
   };
 
@@ -144,12 +163,72 @@ export default function Medications() {
     if (!confirm("Are you sure you want to delete this medication?")) return;
     try {
       await deleteMutation.mutateAsync({ medicationId, hubId });
-      toast.success("Medication deleted");
+      alert("Medication deleted");
       medicationsQuery.refetch();
     } catch (error) {
-      toast.error("Failed to delete medication");
+      alert("Failed to delete medication");
     }
   };
+
+  // Handle extraction result from Seer Engine
+  const handleExtractResult = (result: any) => {
+    setSelectedExtraction(result);
+    setExtractionHistory([result, ...extractionHistory]);
+    
+    // If low confidence, show review modal
+    if (result.confidence === "low") {
+      setShowReview(true);
+    } else {
+      // For high confidence, show result card
+      setScannedData(result);
+    }
+  };
+
+  // Handle medication save from review modal
+  const handleSaveMedication = (medication: any) => {
+    setShowReview(false);
+    setSelectedExtraction(null);
+    medicationsQuery.refetch();
+    alert("Medication saved to hub");
+  };
+
+  // Format refill date as relative text
+  const formatRefillDate = (dateStr?: string): string => {
+    if (!dateStr) return "No refill date";
+    const date = new Date(dateStr);
+    const today = new Date();
+    const daysUntil = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysUntil < 0) return `Overdue by ${Math.abs(daysUntil)} days`;
+    if (daysUntil === 0) return "Refill today";
+    if (daysUntil === 1) return "Refill tomorrow";
+    return `Refill in ${daysUntil} days`;
+  };
+
+  // Get confidence badge color
+  const getConfidenceBadgeColor = (confidence?: string) => {
+    switch (confidence) {
+      case "high":
+        return "bg-[#0D9488] text-white";
+      case "medium":
+        return "bg-amber-500 text-white";
+      case "low":
+        return "bg-[#DC2626] text-white";
+      default:
+        return "bg-gray-300 text-gray-700";
+    }
+  };
+
+  // Count unreviewed low-confidence extractions
+  const unreviewed = extractionHistory.filter(e => !e.reviewed && e.confidence === "low").length;
+
+  // Filter extraction history
+  const filteredHistory = extractionHistory.filter(e => {
+    if (confidenceFilter !== "all" && e.confidence !== confidenceFilter) return false;
+    if (reviewedFilter === "reviewed" && !e.reviewed) return false;
+    if (reviewedFilter === "unreviewed" && e.reviewed) return false;
+    return true;
+  });
 
   if (medicationsQuery.isLoading || hubQuery.isLoading) {
     return (
@@ -167,28 +246,96 @@ export default function Medications() {
       <ResponsiveNav hubId={hubId} />
       <div className="min-h-screen bg-gradient-to-br from-[#FFFBF0] to-slate-100 p-4 md:p-6 md:ml-0">
         <div className="max-w-4xl mx-auto">
+          {/* Review Modal */}
+          {showReview && selectedExtraction && (
+            <MedicationReviewModal
+              extraction={selectedExtraction}
+              onSave={handleSaveMedication}
+              onDiscard={() => {
+                setShowReview(false);
+                setSelectedExtraction(null);
+              }}
+              isAdmin={isFamilyAdmin || false}
+            />
+          )}
+
+          {/* Page Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-slate-900">Medications</h1>
               <p className="text-slate-600 mt-2">Manage active and inactive medications</p>
             </div>
+            {(isFamilyAdmin || isFamilyMember) && (
+              <Button 
+                onClick={() => setActiveTab("medications")}
+                className="bg-[#0D9488] hover:bg-[#0a7a6f]"
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                Scan Label
+              </Button>
+            )}
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-2 mb-6 border-b border-gray-200">
+            <button
+              onClick={() => setActiveTab("medications")}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === "medications"
+                  ? "text-[#0D9488] border-b-2 border-[#0D9488]"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Medications
+            </button>
             {isFamilyAdmin && (
-              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <button
+                onClick={() => setActiveTab("history")}
+                className={`px-4 py-2 font-medium transition-colors relative ${
+                  activeTab === "history"
+                    ? "text-[#0D9488] border-b-2 border-[#0D9488]"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Extraction History
+                {unreviewed > 0 && (
+                  <span className="ml-2 inline-flex items-center justify-center w-5 h-5 bg-[#DC2626] text-white text-xs font-bold rounded-full">
+                    {unreviewed}
+                  </span>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* MEDICATIONS TAB */}
+          {activeTab === "medications" && (
+            <div className="space-y-6">
+              {/* Scan Label Modal */}
+              <Dialog open={isDialogOpen && activeTab === "medications"} onOpenChange={setIsDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button onClick={() => handleOpenDialog()} size="lg" className="bg-[#0D9488] hover:bg-[#0a7a6f]">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Add Medication
-                  </Button>
+                  <div />
                 </DialogTrigger>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-2xl">
                   <DialogHeader>
-                    <DialogTitle>{editingId ? "Edit" : "Add"} Medication</DialogTitle>
+                    <DialogTitle>Scan Medication Label</DialogTitle>
                     <DialogDescription>
-                      Enter the medication details below. You can also scan a medication label using your camera.
+                      Use your camera to scan a medication label. The system will extract the information automatically.
                     </DialogDescription>
                   </DialogHeader>
 
-                  {showCamera ? (
+                  {!scannedData && !showCamera && (
+                    <div className="space-y-4">
+                      <Button
+                        onClick={startCamera}
+                        className="w-full bg-[#0D9488] hover:bg-[#0a7a6f]"
+                      >
+                        <Camera className="mr-2 h-4 w-4" />
+                        Open Camera
+                      </Button>
+                    </div>
+                  )}
+
+                  {showCamera && !scannedData && (
                     <div className="space-y-4">
                       <div className="relative bg-black rounded-lg overflow-hidden">
                         <video
@@ -219,7 +366,7 @@ export default function Medications() {
                           ) : (
                             <>
                               <Camera className="mr-2 h-4 w-4" />
-                              Capture Label
+                              Capture & Scan
                             </>
                           )}
                         </Button>
@@ -232,196 +379,211 @@ export default function Medications() {
                         </Button>
                       </div>
                     </div>
-                  ) : scannedData ? (
+                  )}
+
+                  {scannedData && (
                     <div className="space-y-4">
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex items-start gap-2">
-                        <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="font-semibold text-green-900">Label Scanned Successfully</p>
-                          <p className="text-sm text-green-700 mt-1">Please review the extracted information below and make any corrections before confirming.</p>
-                        </div>
+                      <div className="p-4 bg-blue-50 border border-blue-200 rounded">
+                        <p className="text-blue-700 font-medium">✓ Extraction Complete</p>
+                        <p className="text-blue-600 text-sm mt-1">Review the extracted information below and click 'Save' to add to medications list.</p>
                       </div>
-
-                      <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                          <Label htmlFor="name">Medication Name *</Label>
-                          <Input
-                            id="name"
-                            value={formData.name}
-                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                            placeholder="e.g., Aspirin"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="dosage">Dosage</Label>
-                          <Input
-                            id="dosage"
-                            value={formData.dosage}
-                            onChange={(e) => setFormData({ ...formData, dosage: e.target.value })}
-                            placeholder="e.g., 500mg"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="frequency">Frequency</Label>
-                          <Input
-                            id="frequency"
-                            value={formData.frequency}
-                            onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-                            placeholder="e.g., Twice daily"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="instructions">Instructions</Label>
-                          <Input
-                            id="instructions"
-                            value={formData.instructions}
-                            onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-                            placeholder="e.g., Take with food"
-                          />
-                        </div>
-
-                        <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
-                          <p className="font-semibold">⚠️ Safety Notice</p>
-                          <p className="mt-1">Kinto is a logistics tool. Verify all scanned dosages with a healthcare professional.</p>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <Button
-                            type="submit"
-                            className="flex-1 bg-[#0D9488] hover:bg-[#0a7a6f]"
-                          >
-                            <CheckCircle className="mr-2 h-4 w-4" />
-                            Confirm & Save
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={() => {
-                              setScannedData(null);
-                              setFormData({ name: "", dosage: "", frequency: "", instructions: "" });
-                            }}
-                          >
-                            Clear
-                          </Button>
-                        </div>
-                      </form>
                     </div>
-                  ) : (
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      <div>
-                        <Label htmlFor="name">Medication Name *</Label>
-                        <Input
-                          id="name"
-                          value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                          placeholder="e.g., Aspirin"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="dosage">Dosage</Label>
-                        <Input
-                          id="dosage"
-                          value={formData.dosage}
-                          onChange={(e) => setFormData({ ...formData, dosage: e.target.value })}
-                          placeholder="e.g., 500mg"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="frequency">Frequency</Label>
-                        <Input
-                          id="frequency"
-                          value={formData.frequency}
-                          onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-                          placeholder="e.g., Twice daily"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="instructions">Instructions</Label>
-                        <Input
-                          id="instructions"
-                          value={formData.instructions}
-                          onChange={(e) => setFormData({ ...formData, instructions: e.target.value })}
-                          placeholder="e.g., Take with food"
-                        />
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button
-                          type="submit"
-                          className="flex-1 bg-[#0D9488] hover:bg-[#0a7a6f]"
-                        >
-                          {editingId ? "Update" : "Add"} Medication
-                        </Button>
-                        {!editingId && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="flex-1"
-                            onClick={startCamera}
-                          >
-                            <Camera className="mr-2 h-4 w-4" />
-                            Scan Label
-                          </Button>
-                        )}
-                      </div>
-                    </form>
                   )}
                 </DialogContent>
               </Dialog>
-            )}
-          </div>
 
-          {medications.length === 0 ? (
-            <Card className="rounded-[32px]">
-              <CardContent className="pt-12 text-center">
-                <p className="text-slate-600">No medications yet. {isFamilyAdmin && "Add one to get started."}</p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {medications.map((med) => (
-                <Card key={med.id} className="rounded-[32px] hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-xl">{med.name}</CardTitle>
-                        {med.dosage && <p className="text-sm text-slate-600 mt-1">{med.dosage}</p>}
-                      </div>
-                      {isFamilyAdmin && (
-                        <div className="flex gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenDialog(med)}
-                          >
-                            <Edit2 className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(med.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-[#F87171]" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    {med.frequency && (
-                      <p className="text-sm text-slate-600">
-                        <span className="font-semibold">Frequency:</span> {med.frequency}
-                      </p>
-                    )}
-                    {med.instructions && (
-                      <p className="text-sm text-slate-600">
-                        <span className="font-semibold">Instructions:</span> {med.instructions}
-                      </p>
-                    )}
+              {/* Medications List */}
+              {medications.length === 0 ? (
+                <Card className="border-2 border-dashed border-gray-300">
+                  <CardContent className="p-12 text-center">
+                    <p className="text-gray-600 text-lg">No medications saved yet.</p>
+                    <p className="text-gray-500 mt-2">Tap "Scan Label" to add one.</p>
                   </CardContent>
                 </Card>
-              ))}
+              ) : (
+                <div className="grid gap-4">
+                  {medications
+                    .sort((a, b) => {
+                      if (!a.refillDate) return 1;
+                      if (!b.refillDate) return -1;
+                      return new Date(a.refillDate).getTime() - new Date(b.refillDate).getTime();
+                    })
+                    .map((med) => (
+                      <Card key={med.id} className="hover:shadow-lg transition-shadow">
+                        <CardContent className="p-6">
+                          {/* Needs Review Banner */}
+                          {med.confidence === "low" && !med.reviewed && (
+                            <div className="mb-4 p-3 bg-red-50 border border-[#DC2626] rounded text-sm text-[#DC2626]">
+                              ⚠️ This extraction needs admin review before use
+                            </div>
+                          )}
+
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <h3 className="text-xl font-semibold text-slate-900">{med.name}</h3>
+                                {med.confidence && (
+                                  <span className={`px-2 py-1 rounded text-xs font-medium ${getConfidenceBadgeColor(med.confidence)}`}>
+                                    {med.confidence === "high" && "High"}
+                                    {med.confidence === "medium" && "Medium"}
+                                    {med.confidence === "low" && "Low"}
+                                  </span>
+                                )}
+                              </div>
+
+                              {med.dosage && <p className="text-gray-700"><strong>Dosage:</strong> {med.dosage}</p>}
+                              {med.frequency && <p className="text-gray-700"><strong>Frequency:</strong> {med.frequency}</p>}
+                              {med.prescriber && <p className="text-gray-700"><strong>Prescriber:</strong> {med.prescriber}</p>}
+
+                              <div className="mt-3 flex flex-wrap gap-3">
+                                {med.refillDate && (
+                                  <div className="text-sm">
+                                    <span className="font-medium text-slate-900">{formatRefillDate(med.refillDate)}</span>
+                                  </div>
+                                )}
+
+                                {med.pharmacyName && (
+                                  <div className="text-sm">
+                                    <span className="font-medium text-slate-900">{med.pharmacyName}</span>
+                                    {med.pharmacyPhone && (
+                                      <a
+                                        href={`tel:${med.pharmacyPhone}`}
+                                        className="ml-2 inline-flex items-center text-[#0D9488] hover:underline"
+                                      >
+                                        <Phone className="h-3 w-3 mr-1" />
+                                        Call
+                                      </a>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {isFamilyAdmin && (
+                              <div className="flex gap-2">
+                                <Button
+                                  onClick={() => handleOpenDialog(med)}
+                                  variant="outline"
+                                  size="sm"
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  onClick={() => handleDelete(med.id)}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                </div>
+              )}
+
+              {/* Compliance Footer */}
+              <div className="p-4 bg-[#FDF8F2] border border-[#E5D4C1] rounded text-xs text-gray-700">
+                Kinto Care is a logistics and data coordination tool. No medical diagnosis provided.
+              </div>
+            </div>
+          )}
+
+          {/* EXTRACTION HISTORY TAB */}
+          {activeTab === "history" && isFamilyAdmin && (
+            <div className="space-y-6">
+              {/* Filters */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Confidence Level</Label>
+                  <select
+                    value={confidenceFilter}
+                    onChange={(e) => setConfidenceFilter(e.target.value as any)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="all">All Levels</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Review Status</Label>
+                  <select
+                    value={reviewedFilter}
+                    onChange={(e) => setReviewedFilter(e.target.value as any)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="all">All</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="unreviewed">Needs Review</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* History List */}
+              {filteredHistory.length === 0 ? (
+                <Card className="border-2 border-dashed border-gray-300">
+                  <CardContent className="p-12 text-center">
+                    <p className="text-gray-600">No extractions match your filters.</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-2">
+                  {filteredHistory.map((extraction) => (
+                    <Card key={extraction.id} className="hover:shadow-md transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-slate-900">{extraction.extracted?.medication_name || "Unknown"}</h4>
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${getConfidenceBadgeColor(extraction.confidence)}`}>
+                                {extraction.confidence === "high" && "High"}
+                                {extraction.confidence === "medium" && "Medium"}
+                                {extraction.confidence === "low" && "Low"}
+                              </span>
+                              {extraction.reviewed ? (
+                                <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-700">
+                                  ✓ Reviewed
+                                </span>
+                              ) : (
+                                <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-700">
+                                  Needs Review
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Extracted {extraction.extracted_at || 'Unknown'}
+                            </p>
+                          </div>
+
+                          {!extraction.reviewed && extraction.confidence === "low" && (
+                            <Button
+                              onClick={() => {
+                                setSelectedExtraction(extraction);
+                                setShowReview(true);
+                              }}
+                              size="sm"
+                              className="bg-[#0D9488] hover:bg-[#0a7a6f]"
+                            >
+                              Review
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* Compliance Footer */}
+              <div className="p-4 bg-[#FDF8F2] border border-[#E5D4C1] rounded text-xs text-gray-700">
+                Kinto Care is a logistics and data coordination tool. No medical diagnosis provided.
+              </div>
             </div>
           )}
         </div>
