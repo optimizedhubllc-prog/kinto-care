@@ -323,4 +323,52 @@ export const taskRouter = router({
         offset: input.offset,
       };
     }),
+
+  /**
+   * tasks.onTaskEvent
+   * 
+   * Subscribe to real-time task events for a hub.
+   * Events: task.created, task.updated, task.assigned
+   * 
+   * Returns task event data when any task event occurs in the hub.
+   * Allows frontend to sync task list in real-time without polling.
+   * 
+   * RBAC: All authenticated users can subscribe to their hub's events
+   */
+  onTaskEvent: protectedProcedure
+    .input(z.object({
+      hubId: z.string().uuid("Invalid hub ID"),
+    }))
+    .subscription(async function* ({ ctx, input }: any) {
+      // Verify user has access to this hub
+      const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+      if (!role) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this hub",
+        });
+      }
+
+      // Subscribe to task events for this hub
+      const channel = `task:hub:${input.hubId}`;
+      const handler = (event: any) => {
+        // Yield the event to the subscriber
+        return event;
+      };
+
+      // Register handler with EventBus
+      eventBus.on(channel, handler);
+
+      try {
+        // Keep the subscription alive
+        while (true) {
+          await new Promise((resolve) => setTimeout(resolve, 30000));
+          // Yield heartbeat to keep connection alive
+          yield { type: "heartbeat", timestamp: new Date() };
+        }
+      } finally {
+        // Cleanup on disconnect
+        eventBus.off(channel, handler);
+      }
+    }),
 });

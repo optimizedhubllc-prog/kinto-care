@@ -3,9 +3,9 @@ import { TaskFilters } from "@/components/TaskFilters";
 import { TaskCreateModal } from "@/components/TaskCreateModal";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { AlertCircle, CheckCircle2, Clock, Loader2, Plus } from "lucide-react";
+import { AlertCircle, CheckCircle2, Clock, Loader2, Plus, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import React, { useMemo, useState, useEffect, useCallback } from "react";
+import React, { useMemo, useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * TaskDashboard Component
@@ -69,14 +69,29 @@ export function TaskDashboard() {
     }
   );
 
-  // Real-time sync: Auto-refresh task list periodically
-  // In production, this would use tRPC subscriptions via EventBus
-  // For now, we rely on mutation.onSuccess and manual invalidation
-  useEffect(() => {
-    const interval = setInterval(() => {
-      trpc.useUtils().tasks.list.invalidate();
-    }, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
+  // Real-time sync: Subscribe to task events for live updates
+  const { data: taskEventData, status: subscriptionStatus } = trpc.tasks.onTaskEvent.useSubscription(
+    {
+      hubId: JAQUEZ_HUB_ID,
+    },
+    {
+      onData: (event: any) => {
+        // Silently refresh task list when events arrive
+        if (event.type !== "heartbeat") {
+          console.log("Task event received:", event.type);
+          trpc.useUtils().tasks.list.invalidate();
+        }
+      },
+      onError: (error) => {
+        console.error("Subscription error:", error);
+      },
+    }
+  );
+
+  // Fallback to manual refresh if subscription fails
+  const handleManualRefresh = useCallback(() => {
+    trpc.useUtils().tasks.list.invalidate();
+    console.log("Manual refresh triggered");
   }, []);
 
   // Filter tasks by priority and assigned user
@@ -155,16 +170,28 @@ export function TaskDashboard() {
                 {user?.role === "user" && "View and update your assigned tasks"}
               </p>
             </div>
-            {(user?.role === "admin" || user?.role === "user") && (
-              <Button
-                onClick={() => setIsCreateModalOpen(true)}
-                className="bg-teal-600 hover:bg-teal-700 text-white h-10 px-4 sm:px-6 whitespace-nowrap"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                <span className="hidden sm:inline">New Task</span>
-                <span className="sm:hidden">+</span>
-              </Button>
-            )}
+            <div className="flex gap-2">
+              {(user?.role === "admin" || user?.role === "user") && (
+                <Button
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="bg-teal-600 hover:bg-teal-700 text-white h-10 px-4 sm:px-6 whitespace-nowrap"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">New Task</span>
+                  <span className="sm:hidden">+</span>
+                </Button>
+              )}
+              {subscriptionStatus === "error" && (
+                <Button
+                  onClick={handleManualRefresh}
+                  variant="outline"
+                  className="h-10 px-4 text-sm"
+                  title="Connection lost - click to refresh"
+                >
+                  Refresh
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

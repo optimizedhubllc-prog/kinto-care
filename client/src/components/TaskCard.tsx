@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { TaskCompletionConfirmDialog } from "@/components/TaskCompletionConfirmDialog";
 import { format, formatDistance, isPast, parseISO } from "date-fns";
 import React, { useState } from "react";
 
@@ -45,6 +46,8 @@ export function TaskCard({
   isUpdating = false,
 }: TaskCardProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isCompletionDialogOpen, setIsCompletionDialogOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Calculate relative due date
   const getDueDateDisplay = () => {
@@ -96,9 +99,25 @@ export function TaskCard({
   };
 
   const handleStatusChange = (newStatus: string) => {
-    if (newStatus !== status && onStatusChange) {
+    if (newStatus === "completed" && status !== "completed") {
+      // Show confirmation dialog for completion
+      setIsCompletionDialogOpen(true);
+      setIsOpen(false);
+    } else if (newStatus !== status && onStatusChange) {
+      // Direct status change for non-completion transitions
       onStatusChange(id, newStatus as "pending" | "in_progress" | "completed");
       setIsOpen(false);
+    }
+  };
+
+  const handleConfirmCompletion = async (notes?: string) => {
+    setIsSubmitting(true);
+    try {
+      if (onStatusChange) {
+        await onStatusChange(id, "completed");
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -165,6 +184,15 @@ export function TaskCard({
           </div>
         )}
       </div>
+
+      {/* Task Completion Confirmation Dialog */}
+      <TaskCompletionConfirmDialog
+        open={isCompletionDialogOpen}
+        onOpenChange={setIsCompletionDialogOpen}
+        taskTitle={title}
+        onConfirm={handleConfirmCompletion}
+        isLoading={isSubmitting}
+      />
     </Card>
   );
 }
