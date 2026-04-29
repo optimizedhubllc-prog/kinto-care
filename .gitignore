@@ -111,3 +111,9 @@ temp/
 
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
+
+# Seed scripts (contain family personal data)
+insert-jaquez-family.mjs
+insert-jaquez-family.sql
+seed-jaquez-family.mjs
+seed-auth-users.mjs

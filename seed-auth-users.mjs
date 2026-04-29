@@ -65,12 +65,16 @@ async function seedAuthUsers() {
   try {
     console.log('🌱 Seeding Kinto Care test users...\n');
 
+    // Get credentials from environment
+    const url = process.env.VITE_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
     // Initialize Supabase client
-    if (!supabaseUrl || !supabaseServiceKey) {
+    if (!url || !key) {
       throw new Error('Missing Supabase credentials in environment variables');
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = createClient(url, key);
 
     // Initialize MySQL connection
     const dbConnection = await mysql.createConnection({
