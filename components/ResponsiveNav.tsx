@@ -1,5 +1,6 @@
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/_core/hooks/useAuth";
-import { useLocation } from "wouter";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Pill, Calendar, Users, Stethoscope, Home, LogOut, Menu, X } from "lucide-react";
 import { useState } from "react";
@@ -19,7 +20,7 @@ interface ResponsiveNavProps {
  */
 export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
   const { user, logout } = useAuth();
-  const [location, setLocation] = useLocation();
+  
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -34,7 +35,7 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
 
   const handleLogout = () => {
     logout();
-    setLocation("/");
+    router.push("/");
   };
 
   return (
@@ -56,7 +57,7 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
             return (
               <button
                 key={item.path}
-                onClick={() => setLocation(item.path)}
+                onClick={() => router.push(item.path)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] transition-all duration-200 ${
                   isActive(item.path)
                     ? "bg-[#0D9488] text-white shadow-md"
@@ -118,7 +119,7 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
               <button
                 key={item.path}
                 onClick={() => {
-                  setLocation(item.path);
+                  router.push(item.path);
                   setIsMobileMenuOpen(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-[2rem] transition-all duration-200 ${
@@ -157,7 +158,7 @@ export default function ResponsiveNav({ hubId }: ResponsiveNavProps) {
             return (
               <button
                 key={item.path}
-                onClick={() => setLocation(item.path)}
+                onClick={() => router.push(item.path)}
                 className={`flex-1 flex flex-col items-center justify-center py-3 transition-all duration-200 ${
                   isActive(item.path)
                     ? "text-[#0D9488] border-t-2 border-[#0D9488]"

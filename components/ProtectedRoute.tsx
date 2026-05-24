@@ -1,5 +1,6 @@
+import { useRouter } from "next/navigation";
 import { ReactNode } from "react";
-import { useLocation } from "wouter";
+import { usePathname } from "next/navigation";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -29,7 +30,7 @@ export function ProtectedRoute({
   fallback,
 }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
-  const [, setLocation] = useLocation();
+  
 
   // Show loading state while checking authentication
   if (loading) {
@@ -44,7 +45,7 @@ export function ProtectedRoute({
 
   // Redirect to login if not authenticated
   if (!user) {
-    setLocation("/login");
+    router.push("/login");
     return null;
   }
 
@@ -53,7 +54,7 @@ export function ProtectedRoute({
     const userRole = user.hubMemberRole || "family_member";
     if (!allowedRoles.includes(userRole as any)) {
       toast.error("Access denied");
-      setLocation("/dashboard");
+      router.push("/dashboard");
       return null;
     }
   }

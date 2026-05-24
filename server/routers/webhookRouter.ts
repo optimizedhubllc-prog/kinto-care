@@ -121,7 +121,7 @@ export const webhookRouter = router({
       }
 
       // Build webhook URL from request origin
-      const webhookUrl = `${process.env.VITE_FRONTEND_FORGE_API_URL || "https://api.manus.im"}/api/webhooks/notifications`;
+      const webhookUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/webhooks/n8n`;
 
       return {
         url: webhookUrl,

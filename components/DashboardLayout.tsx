@@ -1,3 +1,4 @@
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -24,7 +25,7 @@ import { useIsMobile } from "@/hooks/useMobile";
 import { useTranslation } from "@/contexts/LanguageContext";
 import { LayoutDashboard, LogOut, PanelLeft, Users, Phone } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { usePathname } from "next/navigation";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
 
@@ -114,7 +115,8 @@ function DashboardLayoutContent({
 }: DashboardLayoutContentProps) {
   const { user, logout } = useAuth();
   const { t, language } = useTranslation();
-  const [location, setLocation] = useLocation();
+  const location = usePathname();
+  const router = useRouter();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
@@ -204,7 +206,7 @@ function DashboardLayoutContent({
                   <SidebarMenuItem key={item.path}>
                     <SidebarMenuButton
                       isActive={isActive}
-                      onClick={() => setLocation(item.path)}
+                      onClick={() => router.push(item.path)}
                       tooltip={t(item.key)}
                       className={`h-10 transition-all font-normal`}
                     >
