@@ -42,3 +42,5 @@ export default async function HomePage() {
     redirect("/onboarding");
   }
 }
+
+export const dynamic = 'force-dynamic';
