@@ -1,140 +1,98 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, date, datetime, boolean, uniqueIndex } from "drizzle-orm/mysql-core";
+import {
+  pgTable, pgEnum, text, varchar, boolean,
+  timestamp, date, uuid, integer, jsonb, uniqueIndex
+} from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import crypto from "crypto";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
-export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
-  id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
-  openId: varchar("openId", { length: 64 }).notNull().unique(),
+// ============================================================================
+// Enums
+// ============================================================================
+export const userRoleEnum = pgEnum("user_role", [
+  "user", "admin", "family_admin", "family_member", "caregiver",
+]);
+export const hubMemberRoleEnum = pgEnum("hub_member_role", [
+  "family_admin", "family_viewer", "caregiver",
+]);
+export const webhookStatusEnum = pgEnum("webhook_status", [
+  "pending", "delivered", "failed",
+]);
+export const taskPriorityEnum = pgEnum("task_priority", ["low", "medium", "high"]);
+export const taskStatusEnum = pgEnum("task_status", ["pending", "in_progress", "completed"]);
+
+// ============================================================================
+// Users — anchored to Supabase auth.users UUID
+// ============================================================================
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey(), // FK to auth.users(id)
   name: text("name"),
-  /** Email address for user notifications. Nullable for backward compatibility, unique to prevent duplicates. */
-  email: varchar("email", { length: 320 }).unique(),
-  loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
-  /** Hub member role for Kinto Care (family_admin, family_member, caregiver) */
-  hubMemberRole: varchar("hub_member_role", { length: 32 }).default("family_member"),
-  /** Primary hub ID for this user */
-  hubId: varchar("hub_id", { length: 36 }),
-  /** User's language preference (en, es, etc.) */
+  email: varchar("email", { length: 320 }),
+  role: userRoleEnum("role").default("user").notNull(),
   languagePreference: varchar("language_preference", { length: 5 }).default("en").notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-  lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  lastSignedIn: timestamp("last_signed_in", { withTimezone: true }).defaultNow().notNull(),
 });
-
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // ============================================================================
-// KINTO: Patient Hub & RBAC Tables
+// Patient Hubs
 // ============================================================================
-
-/**
- * Role enum for hub members.
- * - family_admin: Full access, can manage members and all data
- * - family_viewer: Read-only access to all data
- * - caregiver: Read-only access to all data
- */
-export const hubMemberRoleEnum = mysqlEnum("hub_member_role", [
-  "family_admin",
-  "family_viewer",
-  "caregiver",
-]);
-
-/**
- * Patient Hubs: The central entity representing a patient's care ecosystem.
- * Each hub has a patient name, date of birth, and is created by a Family Admin.
- */
-export const patientHubs = mysqlTable("patient_hubs", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+export const patientHubs = pgTable("patient_hubs", {
+  id: uuid("id").primaryKey().defaultRandom(),
   patientName: text("patient_name").notNull(),
   patientDob: date("patient_dob"),
-  createdBy: int("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
 export type PatientHub = typeof patientHubs.$inferSelect;
 export type InsertPatientHub = typeof patientHubs.$inferInsert;
 
-/**
- * Hub Members: Links users to patient hubs with specific roles.
- * Enforces RBAC via row-level security policies.
- */
-export const hubMembers = mysqlTable(
-  "hub_members",
-  {
-    id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-    hubId: varchar("hub_id", { length: 36 })
-      .notNull()
-      .references(() => patientHubs.id, { onDelete: "cascade" }),
-    userId: int("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    role: hubMemberRoleEnum.default("family_viewer").notNull(),
-    createdAt: timestamp("created_at").defaultNow().notNull(),
-    updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
-  },
-  (table) => ({
-    uniqueHubUser: uniqueIndex("unique_hub_user").on(table.hubId, table.userId),
-  })
-);
-
+// ============================================================================
+// Hub Members
+// ============================================================================
+export const hubMembers = pgTable("hub_members", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: hubMemberRoleEnum("role").default("family_viewer").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({ uniqueHubUser: uniqueIndex("unique_hub_user").on(t.hubId, t.userId) }));
 export type HubMember = typeof hubMembers.$inferSelect;
 export type InsertHubMember = typeof hubMembers.$inferInsert;
 
-/**
- * Medical Contacts: Reference database of doctors and medical professionals.
- * Managed by Family Admins, viewable by all hub members.
- */
-export const medicalContacts = mysqlTable("medical_contacts", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  hubId: varchar("hub_id", { length: 36 })
-    .notNull()
-    .references(() => patientHubs.id, { onDelete: "cascade" }),
+// ============================================================================
+// Medical Contacts
+// ============================================================================
+export const medicalContacts = pgTable("medical_contacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   specialty: text("specialty"),
   phone: varchar("phone", { length: 20 }),
   email: varchar("email", { length: 320 }),
   address: text("address"),
   notes: text("notes"),
-  createdBy: int("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
 export type MedicalContact = typeof medicalContacts.$inferSelect;
-export type InsertMedicalContact = typeof medicalContacts.$inferInsert;
 
-/**
- * Medications: List of active and inactive medications for the patient.
- * Add/edit/archive restricted to Family Admins via RLS.
- */
-export const medications = mysqlTable("medications", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  hubId: varchar("hub_id", { length: 36 })
-    .notNull()
-    .references(() => patientHubs.id, { onDelete: "cascade" }),
+// ============================================================================
+// Medications (Seer Engine extended fields)
+// ============================================================================
+export const medications = pgTable("medications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   dosage: text("dosage"),
-  frequency: text("frequency"), // e.g., "Twice daily", "Every 8 hours"
+  frequency: text("frequency"),
   instructions: text("instructions"),
   isActive: boolean("is_active").default(true).notNull(),
-  createdBy: int("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
-  // Seer Engine: OCR Medication Label Extraction
   prescriber: text("prescriber"),
-  refillDate: timestamp("refill_date"),
   quantity: text("quantity"),
   pharmacyName: text("pharmacy_name"),
   pharmacyPhone: text("pharmacy_phone"),
@@ -142,377 +100,162 @@ export const medications = mysqlTable("medications", {
   rawLabelImageUrl: text("raw_label_image_url"),
   reviewed: boolean("reviewed").default(false),
   reviewNotes: text("review_notes"),
-  extractedAt: timestamp("extracted_at"),
+  extractedAt: timestamp("extracted_at", { withTimezone: true }),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
 export type Medication = typeof medications.$inferSelect;
-export type InsertMedication = typeof medications.$inferInsert;
 
-/**
- * Appointments: Doctor appointments and medical visits.
- * Can be linked to Medical Contacts. Add/edit/delete restricted to Family Admins via RLS.
- */
-export const appointments = mysqlTable("appointments", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  hubId: varchar("hub_id", { length: 36 })
-    .notNull()
-    .references(() => patientHubs.id, { onDelete: "cascade" }),
-  medicalContactId: varchar("medical_contact_id", { length: 36 }).references(
-    () => medicalContacts.id,
-    { onDelete: "set null" }
-  ),
-  doctorName: text("doctor_name"), // Fallback if not linked to a contact
+// ============================================================================
+// Appointments
+// ============================================================================
+export const appointments = pgTable("appointments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  medicalContactId: uuid("medical_contact_id").references(() => medicalContacts.id, { onDelete: "set null" }),
+  doctorName: text("doctor_name"),
   specialty: text("specialty"),
-  dateTime: datetime("date_time").notNull(),
+  dateTime: timestamp("date_time", { withTimezone: true }).notNull(),
   location: text("location"),
   notes: text("notes"),
-  createdBy: int("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
-
 export type Appointment = typeof appointments.$inferSelect;
-export type InsertAppointment = typeof appointments.$inferInsert;
 
-/**
- * Care Logistics: Shared scheduling log for who is caring for the patient and when.
- * Includes shift start/end times and handover notes.
- * Add/edit/delete restricted to Family Admins via RLS.
- */
-export const careLogistics = mysqlTable("care_logistics", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  hubId: varchar("hub_id", { length: 36 })
-    .notNull()
-    .references(() => patientHubs.id, { onDelete: "cascade" }),
-  caregiverId: int("caregiver_id").references(() => users.id, { onDelete: "set null" }),
-  startTime: datetime("start_time").notNull(),
-  endTime: datetime("end_time").notNull(),
+// ============================================================================
+// Care Logistics
+// ============================================================================
+export const careLogistics = pgTable("care_logistics", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  caregiverId: uuid("caregiver_id").references(() => users.id, { onDelete: "set null" }),
+  startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+  endTime: timestamp("end_time", { withTimezone: true }).notNull(),
   taskNotes: text("task_notes"),
-  createdBy: int("created_by").references(() => users.id),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type CareLogistic = typeof careLogistics.$inferSelect;
+
+// ============================================================================
+// Webhook Events & Logs
+// ============================================================================
+export const webhookEvents = pgTable("webhook_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  message: text("message").notNull(),
+  payload: text("payload"),
+  status: webhookStatusEnum("status").default("pending").notNull(),
+  deliveredAt: timestamp("delivered_at", { withTimezone: true }),
+  failureReason: text("failure_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+
+export const webhookLogs = pgTable("webhook_logs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  webhookEventId: uuid("webhook_event_id").notNull().references(() => webhookEvents.id, { onDelete: "cascade" }),
+  statusCode: integer("status_code").notNull(),
+  responseMessage: text("response_message"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: text("user_agent"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
-export type CareLogistic = typeof careLogistics.$inferSelect;
-export type InsertCareLogistic = typeof careLogistics.$inferInsert;
+// ============================================================================
+// Medication Audit Trail
+// ============================================================================
+export const medicationAuditTrail = pgTable("medication_audit_trail", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  medicationId: uuid("medication_id").notNull().references(() => medications.id, { onDelete: "cascade" }),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id),
+  changedBy: uuid("changed_by").references(() => users.id),
+  changeType: text("change_type").notNull(),
+  previousValue: jsonb("previous_value"),
+  newValue: jsonb("new_value"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 // ============================================================================
-// Relations (for type inference)
+// Tasks
 // ============================================================================
+export const tasks = pgTable("tasks", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  description: text("description"),
+  dueDate: timestamp("due_date", { withTimezone: true }),
+  assignedTo: uuid("assigned_to").references(() => users.id, { onDelete: "set null" }),
+  createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  priority: taskPriorityEnum("priority").default("medium").notNull(),
+  status: taskStatusEnum("status").default("pending").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = typeof tasks.$inferInsert;
 
+// ============================================================================
+// Contacts (International Routing)
+// ============================================================================
+export const contacts = pgTable("contacts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  phone: text("phone").notNull(),
+  countryCode: varchar("country_code", { length: 2 }).default("US").notNull(),
+  languagePreference: varchar("language_preference", { length: 5 }).default("en").notNull(),
+  notes: text("notes"),
+  createdBy: uuid("created_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type Contact = typeof contacts.$inferSelect;
+
+// ============================================================================
+// API Keys (for n8n)
+// ============================================================================
+export const apiKeys = pgTable("api_keys", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  keyHash: varchar("key_hash", { length: 64 }).notNull().unique(),
+  permissions: varchar("permissions", { length: 255 }).notNull(),
+  createdBy: uuid("created_by").notNull().references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }),
+  isActive: boolean("is_active").default(true).notNull(),
+});
+export type ApiKey = typeof apiKeys.$inferSelect;
+
+// ============================================================================
+// Relations
+// ============================================================================
 export const patientHubsRelations = relations(patientHubs, ({ many, one }) => ({
   members: many(hubMembers),
   medications: many(medications),
   appointments: many(appointments),
   careLogistics: many(careLogistics),
   medicalContacts: many(medicalContacts),
-  creator: one(users, {
-    fields: [patientHubs.createdBy],
-    references: [users.id],
-  }),
+  webhookEvents: many(webhookEvents),
+  tasks: many(tasks),
+  contacts: many(contacts),
+  creator: one(users, { fields: [patientHubs.createdBy], references: [users.id] }),
 }));
 
 export const hubMembersRelations = relations(hubMembers, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [hubMembers.hubId],
-    references: [patientHubs.id],
-  }),
-  user: one(users, {
-    fields: [hubMembers.userId],
-    references: [users.id],
-  }),
+  hub: one(patientHubs, { fields: [hubMembers.hubId], references: [patientHubs.id] }),
+  user: one(users, { fields: [hubMembers.userId], references: [users.id] }),
 }));
 
-export const medicationsRelations = relations(medications, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [medications.hubId],
-    references: [patientHubs.id],
-  }),
-}));
-
-export const appointmentsRelations = relations(appointments, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [appointments.hubId],
-    references: [patientHubs.id],
-  }),
-  medicalContact: one(medicalContacts, {
-    fields: [appointments.medicalContactId],
-    references: [medicalContacts.id],
-  }),
-}));
-
-export const careLogisticsRelations = relations(careLogistics, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [careLogistics.hubId],
-    references: [patientHubs.id],
-  }),
-  caregiver: one(users, {
-    fields: [careLogistics.caregiverId],
-    references: [users.id],
-  }),
-}));
-
-export const medicalContactsRelations = relations(medicalContacts, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [medicalContacts.hubId],
-    references: [patientHubs.id],
-  }),
-}));
-
-// ============================================================================
-// KINTO: Webhook Integration (n8n)
-// ============================================================================
-
-/**
- * Webhook Events: Stores incoming webhook payloads from n8n.
- * Used for audit trail and event history.
- */
-export const webhookEvents = mysqlTable("webhook_events", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  hubId: varchar("hub_id", { length: 36 })
-    .notNull()
-    .references(() => patientHubs.id, { onDelete: "cascade" }),
-  message: text("message").notNull(),
-  payload: text("payload"),
-  status: mysqlEnum("status", ["pending", "delivered", "failed"]).default("pending").notNull(),
-  deliveredAt: timestamp("delivered_at"),
-  failureReason: text("failure_reason"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
-});
-
-export type WebhookEvent = typeof webhookEvents.$inferSelect;
-export type InsertWebhookEvent = typeof webhookEvents.$inferInsert;
-
-/**
- * Webhook Logs: Audit trail for all webhook requests.
- * Tracks request/response details for debugging and compliance.
- */
-export const webhookLogs = mysqlTable("webhook_logs", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  webhookEventId: varchar("webhook_event_id", { length: 36 })
-    .notNull()
-    .references(() => webhookEvents.id, { onDelete: "cascade" }),
-  statusCode: int("status_code").notNull(),
-  responseMessage: text("response_message"),
-  ipAddress: varchar("ip_address", { length: 45 }),
-  userAgent: text("user_agent"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export type WebhookLog = typeof webhookLogs.$inferSelect;
-export type InsertWebhookLog = typeof webhookLogs.$inferInsert;
-
-/**
- * Webhook Relations
- */
-export const webhookEventsRelations = relations(webhookEvents, ({ one, many }) => ({
-  hub: one(patientHubs, {
-    fields: [webhookEvents.hubId],
-    references: [patientHubs.id],
-  }),
-  logs: many(webhookLogs),
-}));
-
-export const webhookLogsRelations = relations(webhookLogs, ({ one }) => ({
-  event: one(webhookEvents, {
-    fields: [webhookLogs.webhookEventId],
-    references: [webhookEvents.id],
-  }),
-}));
-
-
-// ============================================================================
-// KINTO: API Keys for External Services (n8n, webhooks, etc.)
-// ============================================================================
-
-/**
- * API Keys table for external service authentication.
- * Used by n8n and other external services to call protected endpoints.
- * Each API key is scoped to a hub and has specific permissions.
- */
-export const apiKeys = mysqlTable("api_keys", {
-  id: varchar("id", { length: 36 }).primaryKey(), // UUID
-  hubId: varchar("hub_id", { length: 36 }).notNull(),
-  name: varchar("name", { length: 255 }).notNull(), // e.g., "n8n-notifications"
-  keyHash: varchar("key_hash", { length: 64 }).notNull().unique(), // SHA-256 hash of the key
-  permissions: varchar("permissions", { length: 255 }).notNull(), // Comma-separated: "users:read", "webhooks:write"
-  createdBy: int("created_by").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  lastUsedAt: timestamp("last_used_at"),
-  expiresAt: timestamp("expires_at"), // Optional expiration
-  isActive: boolean("is_active").default(true).notNull(),
-});
-
-export type ApiKey = typeof apiKeys.$inferSelect;
-export type InsertApiKey = typeof apiKeys.$inferInsert;
-
-/**
- * API Key Relations
- */
-export const apiKeysRelations = relations(apiKeys, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [apiKeys.hubId],
-    references: [patientHubs.id],
-  }),
-  creator: one(users, {
-    fields: [apiKeys.createdBy],
-    references: [users.id],
-  }),
-}));
-
-
-// ============================================================================
-// KINTO: Task Management (Logistics & Coordination)
-// ============================================================================
-
-/**
- * Priority enum for tasks.
- * - low: Non-urgent, can be scheduled flexibly
- * - medium: Standard priority, should be completed soon
- * - high: Urgent, requires immediate attention
- */
-export const taskPriorityEnum = mysqlEnum("task_priority", [
-  "low",
-  "medium",
-  "high",
-]);
-
-/**
- * Status enum for tasks.
- * Valid transitions: pending → in_progress → completed
- */
-export const taskStatusEnum = mysqlEnum("task_status", [
-  "pending",
-  "in_progress",
-  "completed",
-]);
-
-/**
- * Tasks table: Manages care coordination tasks and assignments.
- * 
- * Trust Pillar: This table contains ONLY logistics and coordination data.
- * NO diagnostic, clinical, or medical information is stored here.
- * Examples of valid tasks:
- * - "Schedule doctor appointment"
- * - "Prepare medication for next week"
- * - "Arrange transportation to clinic"
- * - "Follow up with insurance"
- * 
- * Examples of INVALID tasks (never store these):
- * - Diagnoses, symptoms, or clinical observations
- * - Medication dosages or medical instructions
- * - Patient health metrics or vital signs
- */
-export const tasks = mysqlTable("tasks", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  
-  // Hub association: every task belongs to a hub
-  hubId: varchar("hub_id", { length: 36 })
-    .notNull()
-    .references(() => patientHubs.id, { onDelete: "cascade" }),
-  
-  // Task content
-  title: text("title").notNull(),
-  description: text("description"),
-  
-  // Task scheduling
-  dueDate: timestamp("due_date"),
-  
-  // Task assignment and ownership
-  assignedTo: int("assigned_to")
-    .references(() => users.id, { onDelete: "set null" }),
-  createdBy: int("created_by")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  
-  // Task state
-  priority: taskPriorityEnum.default("medium").notNull(),
-  status: taskStatusEnum.default("pending").notNull(),
-  
-  // Timestamps
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().onUpdateNow().notNull(),
-});
-
-export type Task = typeof tasks.$inferSelect;
-export type InsertTask = typeof tasks.$inferInsert;
-
-/**
- * Task Relations
- */
 export const tasksRelations = relations(tasks, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [tasks.hubId],
-    references: [patientHubs.id],
-  }),
-  assignee: one(users, {
-    fields: [tasks.assignedTo],
-    references: [users.id],
-  }),
-  creator: one(users, {
-    fields: [tasks.createdBy],
-    references: [users.id],
-  }),
-}));
-
-
-// ============================================================================
-// KINTO: Contacts (International Routing & Communication)
-// ============================================================================
-
-/**
- * Contacts table: Manages hub contacts with international routing support.
- * 
- * Features:
- * - Smart routing: US contacts use tel: links, international use WhatsApp + VoIP
- * - Country-aware: Stores country_code for dynamic deep link generation
- * - Language preferences: Supports multi-language communication
- * - E.164 phone format: Ensures compatibility with tel: and WhatsApp deep links
- * 
- * Trust Pillar: Contains ONLY contact logistics information.
- * NO clinical or diagnostic data stored here.
- */
-export const contacts = mysqlTable("contacts", {
-  id: varchar("id", { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
-  
-  // Hub association
-  hubId: varchar("hub_id", { length: 36 })
-    .notNull()
-    .references(() => patientHubs.id, { onDelete: "cascade" }),
-  
-  // Contact information
-  name: text("name").notNull(),
-  role: text("role").notNull(), // family_member, caregiver, medical_facility, pharmacy, other
-  phone: text("phone").notNull(), // E.164 format: +18095551234
-  
-  // International routing
-  countryCode: varchar("country_code", { length: 2 }).default("US").notNull(), // ISO 3166-1 alpha-2
-  languagePreference: varchar("language_preference", { length: 5 }).default("en").notNull(), // en, es, etc.
-  
-  // Notes for context
-  notes: text("notes"),
-  
-  // Audit trail
-  createdBy: int("created_by")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export type Contact = typeof contacts.$inferSelect;
-export type InsertContact = typeof contacts.$inferInsert;
-
-/**
- * Contacts Relations
- */
-export const contactsRelations = relations(contacts, ({ one }) => ({
-  hub: one(patientHubs, {
-    fields: [contacts.hubId],
-    references: [patientHubs.id],
-  }),
-  creator: one(users, {
-    fields: [contacts.createdBy],
-    references: [users.id],
-  }),
+  hub: one(patientHubs, { fields: [tasks.hubId], references: [patientHubs.id] }),
+  assignee: one(users, { fields: [tasks.assignedTo], references: [users.id] }),
+  creator: one(users, { fields: [tasks.createdBy], references: [users.id] }),
 }));

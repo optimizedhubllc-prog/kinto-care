@@ -1,1 +1,0 @@
-DROP TABLE `medication_audit_trail`;
