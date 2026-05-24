@@ -19,7 +19,13 @@
       "@/components/*": ["./components/*"],
       "@/lib/*": ["./lib/*"],
       "@/server/*": ["./server/*"],
-      "@/shared/*": ["./shared/*"]
+      "@/shared/*": ["./shared/*"],
+      "@/hooks/*": ["./hooks/*"],
+      "@/contexts/*": ["./contexts/*"],
+      "@/pages/*": ["./pages/*"],
+      "@shared/*": ["./shared/*"],
+      "@shared/const": ["./shared/const.ts"],
+      "@shared/types": ["./shared/types.ts"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
