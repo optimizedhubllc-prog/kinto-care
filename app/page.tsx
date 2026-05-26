@@ -1,8 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { db } from "@/lib/db";
-import { hubMembers, patientHubs } from "@/drizzle/schema";
-import { eq } from "drizzle-orm";
 import { Heart } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -29,15 +26,16 @@ export default async function HomePage() {
     );
   }
 
-  // Authenticated — redirect to their first hub or onboarding
-  const hubs = await db.select({ hub: patientHubs })
-    .from(hubMembers)
-    .innerJoin(patientHubs, eq(hubMembers.hubId, patientHubs.id))
-    .where(eq(hubMembers.userId, user.id))
-    .limit(1);
+  // Authenticated — find first hub via Supabase client
+  const { data: membership } = await supabase
+    .from("hub_members")
+    .select("hub_id")
+    .eq("user_id", user.id)
+    .limit(1)
+    .single();
 
-  if (hubs.length > 0) {
-    redirect(`/dashboard/${hubs[0].hub.id}`);
+  if (membership?.hub_id) {
+    redirect(`/dashboard/${membership.hub_id}`);
   } else {
     redirect("/onboarding");
   }
