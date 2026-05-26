@@ -21,23 +21,38 @@ export default function OnboardingPage() {
     setError('')
 
     try {
-      const res = await fetch('/api/trpc/hubs.create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          json: {
-            patientName: patientName.trim(),
-            patientDob: patientDob || undefined,
-          }
-        }),
-      })
+      const { createClient } = await import('@/lib/supabase/client')
+      const supabase = createClient()
 
-      const data = await res.json()
-      const hubId = data?.result?.data?.json?.hubId
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Not authenticated')
 
-      if (!hubId) throw new Error('Hub creation failed')
+      const hubId = crypto.randomUUID()
+
+      const { error: hubError } = await supabase
+        .from('patient_hubs')
+        .insert({
+          id: hubId,
+          patient_name: patientName.trim(),
+          patient_dob: patientDob || null,
+          created_by: user.id,
+        })
+
+      if (hubError) throw hubError
+
+      const { error: memberError } = await supabase
+        .from('hub_members')
+        .insert({
+          hub_id: hubId,
+          user_id: user.id,
+          role: 'family_admin',
+        })
+
+      if (memberError) throw memberError
+
       router.push(`/dashboard/${hubId}`)
     } catch (err) {
+      console.error(err)
       setError('Something went wrong. Please try again.')
       setLoading(false)
     }
@@ -69,7 +84,7 @@ export default function OnboardingPage() {
                 id="patientName"
                 type="text"
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 md:text-sm"
-                placeholder="e.g. Pedro Sr."
+                placeholder="e.g. Papi"
                 value={patientName}
                 onChange={(e) => setPatientName(e.target.value)}
                 required
