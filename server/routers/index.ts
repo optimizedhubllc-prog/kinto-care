@@ -357,6 +357,451 @@ export const appRouter = router({
         return db.select().from(webhookEvents).where(eq(webhookEvents.hubId, input.hubId)).orderBy(desc(webhookEvents.createdAt)).limit(input.limit);
       }),
   }),
+// ============================================================================
+// TASK MANAGEMENT API
+// Add this router block inside the appRouter in server/routers/index.ts
+// Place after the existing "users" router block
+// ============================================================================
+//
+// ALSO ADD these imports at the top of index.ts if not already present:
+// import { tasks } from "@/drizzle/schema"; // already imported
+// import eventBus from "@/server/eventBus";  // add this if eventBus exists
+//
+// ============================================================================
+
+  // Tasks
+  tasks: router({
+    /**
+     * tasks.list
+     * List tasks in a hub with role-based filtering.
+     * RBAC:
+     * - family_admin: sees all tasks
+     * - family_viewer / caregiver: sees only tasks assigned to them
+     */
+    list: protectedProcedure
+      .input(z.object({
+        hubId: z.string().uuid(),
+        status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
+        limit: z.number().int().min(1).max(100).default(50),
+        offset: z.number().int().min(0).default(0),
+      }))
+      .query(async ({ ctx, input }) => {
+        const role = await getUserRoleInHub(ctx.user.id, input.hubId);
+        if (!role) throw new TRPCError({ code: "FORBIDDEN" });
+
+        const conditions: any[] = [eq(tasks.hubId, input.hubId)];
+
+        // Non-admins only see tasks assigned to them
+        if (role !== "family_admin") {
+          conditions.push(eq(tasks.assignedTo, ctx.user.id));
+        }
+
+        if (input.status) {
+          conditions.push(eq(tasks.status, input.status));
+        }
+
+        const taskList = await db
+          .select()
+          .from(tasks)
+          .where(and(...conditions))
+          .orderBy(desc(tasks.createdAt))
+          .limit(input.limit)
+          .offset(input.offset);
+
+        return { tasks: taskList, total: taskList.length };
+      }),
+
+    /**
+     * tasks.create
+     * Create a new task in a hub.
+     * Fires webhook: task.created
+     * RBAC: family_admin only
+     */
+    create: protectedProcedure
+      .input(z.object({
+        hubId: z.string().uuid(),
+        title: z.string().min(1, "Title is required").max(255),
+        description: z.string().max(2000).optional(),
+        dueDate: z.string().optional(), // ISO string, converted to Date
+        assignedTo: z.string().uuid().optional(),
+        priority: z.enum(["low", "medium", "high"]).default("medium"),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!await isUserFamilyAdmin(ctx.user.id, input.hubId)) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Only family admins can create tasks",
+          });
+        }
+
+        // If assignedTo provided, verify they are a hub member
+        if (input.assignedTo) {
+          const member = await db
+            .select()
+            .from(hubMembers)
+            .where(and(
+              eq(hubMembers.userId, input.assignedTo),
+              eq(hubMembers.hubId, input.hubId)
+            ))
+            .limit(1);
+
+          if (!member[0]) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Assigned user is not a member of this hub",
+            });
+          }
+        }
+
+        const taskId = crypto.randomUUID();
+        await db.insert(tasks).values({
+          id: taskId,
+          hubId: input.hubId,
+          title: input.title,
+          description: input.description ?? null,
+          dueDate: input.dueDate ? new Date(input.dueDate) : null,
+          assignedTo: input.assignedTo ?? null,
+          createdBy: ctx.user.id,
+          priority: input.priority,
+          status: "pending",
+        });
+
+        const created = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, taskId))
+          .limit(1);
+
+        if (!created[0]) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create task" });
+        }
+
+        // Fire webhook event for n8n
+        try {
+          await fetch(process.env.N8N_WEBHOOK_URL!, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              event: "task.created",
+              taskTitle: created[0].title,
+              priority: created[0].priority,
+              timestamp: new Date().toISOString(),
+              assignedUserId: created[0].assignedTo ?? null,
+            }),
+          });
+        } catch (_) {
+          // Webhook failure is non-blocking — task still created
+        }
+
+        return created[0];
+      }),
+
+    /**
+     * tasks.update
+     * Update a task's status.
+     * Fires webhook: task.updated (on completion)
+     * RBAC: family_admin (any task), family_viewer/caregiver (assigned tasks only)
+     */
+    update: protectedProcedure
+      .input(z.object({
+        taskId: z.string().uuid(),
+        status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
+        title: z.string().min(1).max(255).optional(),
+        description: z.string().max(2000).optional(),
+        dueDate: z.string().optional(),
+        priority: z.enum(["low", "medium", "high"]).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const taskRows = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        const task = taskRows[0];
+        if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+
+        const role = await getUserRoleInHub(ctx.user.id, task.hubId);
+
+        // Non-admins can only update tasks assigned to them
+        if (role !== "family_admin" && task.assignedTo !== ctx.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only update tasks assigned to you",
+          });
+        }
+
+        // Validate status transitions
+        if (input.status) {
+          const validTransitions: Record<string, string[]> = {
+            pending: ["in_progress", "completed", "cancelled"],
+            in_progress: ["completed", "pending", "cancelled"],
+            completed: ["pending"],
+            cancelled: ["pending"],
+          };
+
+          if (!validTransitions[task.status]?.includes(input.status)) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `Cannot transition from ${task.status} to ${input.status}`,
+            });
+          }
+        }
+
+        const updateData: Record<string, unknown> = { updatedAt: new Date() };
+        if (input.status) updateData.status = input.status;
+        if (input.title) updateData.title = input.title;
+        if (input.description !== undefined) updateData.description = input.description;
+        if (input.dueDate) updateData.dueDate = new Date(input.dueDate);
+        if (input.priority) updateData.priority = input.priority;
+
+        await db.update(tasks).set(updateData).where(eq(tasks.id, input.taskId));
+
+        const updated = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        if (!updated[0]) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update task" });
+        }
+
+        // Fire webhook on status change
+        if (input.status && input.status !== task.status) {
+          try {
+            await fetch(process.env.N8N_WEBHOOK_URL!, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                event: "task.updated",
+                taskTitle: updated[0].title,
+                timestamp: new Date().toISOString(),
+                oldStatus: task.status,
+                newStatus: input.status,
+              }),
+            });
+          } catch (_) {
+            // Non-blocking
+          }
+        }
+
+        return updated[0];
+      }),
+
+    /**
+     * tasks.claim
+     * Caregiver or family member self-assigns an unassigned task.
+     * Fires webhook: task.assigned
+     * RBAC: family_admin, family_viewer, caregiver
+     */
+    claim: protectedProcedure
+      .input(z.object({
+        taskId: z.string().uuid(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const taskRows = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        const task = taskRows[0];
+        if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+
+        const role = await getUserRoleInHub(ctx.user.id, task.hubId);
+        if (!role) throw new TRPCError({ code: "FORBIDDEN", message: "You are not a member of this hub" });
+
+        if (task.assignedTo) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Task is already assigned. Use assign to reassign.",
+          });
+        }
+
+        await db
+          .update(tasks)
+          .set({ assignedTo: ctx.user.id, updatedAt: new Date() })
+          .where(eq(tasks.id, input.taskId));
+
+        const updated = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        if (!updated[0]) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to claim task" });
+        }
+
+        // Fire webhook
+        try {
+          await fetch(process.env.N8N_WEBHOOK_URL!, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              event: "task.assigned",
+              taskTitle: updated[0].title,
+              timestamp: new Date().toISOString(),
+              assignedUserId: ctx.user.id,
+            }),
+          });
+        } catch (_) {
+          // Non-blocking
+        }
+
+        return updated[0];
+      }),
+
+    /**
+     * tasks.release
+     * Release a claimed task back to unassigned/pending.
+     * RBAC: family_admin (any task), assignee (own tasks only)
+     */
+    release: protectedProcedure
+      .input(z.object({
+        taskId: z.string().uuid(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const taskRows = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        const task = taskRows[0];
+        if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+
+        const role = await getUserRoleInHub(ctx.user.id, task.hubId);
+
+        // Only family_admin or the assigned user can release
+        if (role !== "family_admin" && task.assignedTo !== ctx.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You can only release tasks assigned to you",
+          });
+        }
+
+        if (!task.assignedTo) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Task is not currently assigned",
+          });
+        }
+
+        await db
+          .update(tasks)
+          .set({ assignedTo: null, status: "pending", updatedAt: new Date() })
+          .where(eq(tasks.id, input.taskId));
+
+        const updated = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        if (!updated[0]) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to release task" });
+        }
+
+        return updated[0];
+      }),
+
+    /**
+     * tasks.assign
+     * Admin assigns a task to a specific hub member.
+     * Fires webhook: task.assigned
+     * RBAC: family_admin only
+     */
+    assign: protectedProcedure
+      .input(z.object({
+        taskId: z.string().uuid(),
+        assignedTo: z.string().uuid(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const taskRows = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        const task = taskRows[0];
+        if (!task) throw new TRPCError({ code: "NOT_FOUND", message: "Task not found" });
+
+        if (!await isUserFamilyAdmin(ctx.user.id, task.hubId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only family admins can assign tasks" });
+        }
+
+        // Verify assignee is a hub member
+        const member = await db
+          .select()
+          .from(hubMembers)
+          .where(and(
+            eq(hubMembers.userId, input.assignedTo),
+            eq(hubMembers.hubId, task.hubId)
+          ))
+          .limit(1);
+
+        if (!member[0]) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Assignee is not a member of this hub",
+          });
+        }
+
+        await db
+          .update(tasks)
+          .set({ assignedTo: input.assignedTo, updatedAt: new Date() })
+          .where(eq(tasks.id, input.taskId));
+
+        const updated = await db
+          .select()
+          .from(tasks)
+          .where(eq(tasks.id, input.taskId))
+          .limit(1);
+
+        if (!updated[0]) {
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to assign task" });
+        }
+
+        // Fire webhook
+        try {
+          await fetch(process.env.N8N_WEBHOOK_URL!, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              event: "task.assigned",
+              taskTitle: updated[0].title,
+              timestamp: new Date().toISOString(),
+              assignedUserId: input.assignedTo,
+            }),
+          });
+        } catch (_) {
+          // Non-blocking
+        }
+
+        return updated[0];
+      }),
+
+    /**
+     * tasks.delete
+     * Delete a task permanently.
+     * RBAC: family_admin only
+     */
+    delete: protectedProcedure
+      .input(z.object({
+        taskId: z.string().uuid(),
+        hubId: z.string().uuid(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        if (!await isUserFamilyAdmin(ctx.user.id, input.hubId)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only family admins can delete tasks" });
+        }
+
+        await db.delete(tasks).where(eq(tasks.id, input.taskId));
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;
