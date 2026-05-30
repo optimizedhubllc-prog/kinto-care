@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Heart, Users, Calendar, Pill, CheckSquare, LogOut, Plus, X } from 'lucide-react'
+import { useTranslation } from '@/hooks/useTranslation'
+import { KintoScan } from '@/components/ui/KintoScan'
 
 type HubMember = { id: string; user_id: string; role: string; users: { name: string | null; email: string | null } | null }
 type Appointment = { id: string; doctor_name: string | null; specialty: string | null; date_time: string; location: string | null; notes: string | null }
@@ -44,12 +46,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 const inputCls = "w-full border rounded-lg px-3 py-2 text-sm text-[#1A2B3C] focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
 
-function SaveBtn({ saving, onSave, onCancel }: { saving: boolean; onSave: () => void; onCancel: () => void }) {
+function SaveBtn({ saving, onSave, onCancel, saveLabel, cancelLabel }: {
+  saving: boolean
+  onSave: () => void
+  onCancel: () => void
+  saveLabel: string
+  cancelLabel: string
+}) {
   return (
     <div className="flex justify-end gap-2 pt-2">
-      <button onClick={onCancel} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">Cancel</button>
+      <button onClick={onCancel} className="px-4 py-2 text-sm border rounded-lg hover:bg-gray-50">{cancelLabel}</button>
       <button onClick={onSave} className="px-4 py-2 text-sm bg-[#DC2626] text-white rounded-lg hover:bg-red-700 font-semibold">
-        {saving ? 'Saving…' : 'Save'}
+        {saving ? '...' : saveLabel}
       </button>
     </div>
   )
@@ -59,6 +67,7 @@ export default function DashboardPage() {
   const params = useParams()
   const router = useRouter()
   const hubId = params.hubId as string
+  const { t, loading: langLoading } = useTranslation()
 
   const [patientName, setPatientName] = useState('')
   const [members, setMembers] = useState<HubMember[]>([])
@@ -72,6 +81,7 @@ export default function DashboardPage() {
   const [apptModal, setApptModal] = useState<null | 'add' | Appointment>(null)
   const [medModal, setMedModal] = useState<null | 'add' | Medication>(null)
   const [taskModal, setTaskModal] = useState<null | 'add' | Task>(null)
+  const [scanModal, setScanModal] = useState(false)
 
   // Form state
   const [apptForm, setApptForm] = useState<Partial<Appointment>>({})
@@ -153,7 +163,7 @@ export default function DashboardPage() {
 
   // Tasks CRUD
   const openAddTask = () => { setTaskForm({ status: 'pending', priority: 'medium' }); setTaskModal('add') }
-  const openEditTask = (t: Task) => { setTaskForm(t); setTaskModal(t) }
+  const openEditTask = (tk: Task) => { setTaskForm(tk); setTaskModal(tk) }
   const saveTask = async () => {
     setSaving(true)
     try {
@@ -175,7 +185,7 @@ export default function DashboardPage() {
   const roleLabel = (role: string) => {
     if (role === 'family_admin') return 'Admin'
     if (role === 'family_viewer') return 'Viewer'
-    if (role === 'caregiver') return 'Caregiver'
+    if (role === 'caregiver') return t('contacts.caregiver')
     return role
   }
 
@@ -186,19 +196,19 @@ export default function DashboardPage() {
   }
 
   const statusLabel = (status: string) => {
-    if (status === 'in_progress') return 'In Progress'
-    if (status === 'completed') return 'Completed'
-    return 'Pending'
+    if (status === 'in_progress') return t('tasks.inProgress')
+    if (status === 'completed') return t('tasks.completed')
+    return t('tasks.pending')
   }
 
   const getMember = (id: string | null) => FAMILY_MEMBERS.find(m => m.id === id)?.name ?? null
 
-  if (loading) {
+  if (loading || langLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FDF8F2]">
         <div className="flex items-center gap-2">
           <Heart className="h-6 w-6 text-[#DC2626] animate-pulse" strokeWidth={1.5} />
-          <span className="text-[#1A2B3C] font-serif">Loading...</span>
+          <span className="text-[#1A2B3C] font-serif">{t('common.loading')}</span>
         </div>
       </div>
     )
@@ -222,7 +232,7 @@ export default function DashboardPage() {
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">Care hub for <strong className="text-[#1A2B3C]">{patientName}</strong></span>
           <button onClick={handleSignOut} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-[#DC2626] transition-colors">
-            <LogOut className="h-4 w-4" />Sign out
+            <LogOut className="h-4 w-4" />{t('nav.logout')}
           </button>
         </div>
       </header>
@@ -257,10 +267,10 @@ export default function DashboardPage() {
         <section className="bg-white rounded-xl border shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">Appointments</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{appointments.length} upcoming</span>
+            <h2 className="font-semibold text-[#1A2B3C]">{t('nav.appointments')}</h2>
+            <span className="ml-auto text-xs text-muted-foreground mr-3">{appointments.length} {t('dashboard.upcomingAppointments').toLowerCase()}</span>
             <button onClick={openAddAppt} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />Add
+              <Plus className="h-3 w-3" />{t('common.add')}
             </button>
           </div>
           {appointments.length === 0 ? (
@@ -278,8 +288,8 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-2 ml-4 shrink-0">
                       <p className="text-xs text-muted-foreground">{new Date(a.date_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
-                      <button onClick={() => openEditAppt(a)} className="text-xs text-[#0D9488] hover:underline">Edit</button>
-                      <button onClick={() => deleteAppt(a.id)} className="text-xs text-[#DC2626] hover:underline">Delete</button>
+                      <button onClick={() => openEditAppt(a)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                      <button onClick={() => deleteAppt(a.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
                     </div>
                   </div>
                 </div>
@@ -292,14 +302,20 @@ export default function DashboardPage() {
         <section className="bg-white rounded-xl border shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
             <Pill className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">Active Medications</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{medications.length} active</span>
+            <h2 className="font-semibold text-[#1A2B3C]">{t('nav.medications')}</h2>
+            <span className="ml-auto text-xs text-muted-foreground mr-3">{medications.length} {t('medications.title').toLowerCase()}</span>
+            <button
+              onClick={() => setScanModal(true)}
+              className="flex items-center gap-1 text-xs bg-[#0D9488] text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-semibold mr-2"
+            >
+              {t('medications.scanLabel')}
+            </button>
             <button onClick={openAddMed} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />Add
+              <Plus className="h-3 w-3" />{t('common.add')}
             </button>
           </div>
           {medications.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No active medications.</p>
+            <p className="text-sm text-muted-foreground">{t('medications.noMeds')}</p>
           ) : (
             <div className="space-y-2">
               {medications.map(m => (
@@ -309,8 +325,8 @@ export default function DashboardPage() {
                     <p className="text-xs text-muted-foreground">{[m.dosage, m.frequency].filter(Boolean).join(' · ')}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => openEditMed(m)} className="text-xs text-[#0D9488] hover:underline">Edit</button>
-                    <button onClick={() => deleteMed(m.id)} className="text-xs text-[#DC2626] hover:underline">Delete</button>
+                    <button onClick={() => openEditMed(m)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                    <button onClick={() => deleteMed(m.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
                   </div>
                 </div>
               ))}
@@ -322,31 +338,31 @@ export default function DashboardPage() {
         <section className="bg-white rounded-xl border shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
             <CheckSquare className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">Tasks</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{tasks.filter(t => t.status !== 'completed').length} open</span>
+            <h2 className="font-semibold text-[#1A2B3C]">{t('tasks.title')}</h2>
+            <span className="ml-auto text-xs text-muted-foreground mr-3">{tasks.filter(tk => tk.status !== 'completed').length} {t('tasks.pending').toLowerCase()}</span>
             <button onClick={openAddTask} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />Add
+              <Plus className="h-3 w-3" />{t('common.add')}
             </button>
           </div>
           {tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tasks yet.</p>
+            <p className="text-sm text-muted-foreground">{t('tasks.noTasks')}</p>
           ) : (
             <div className="space-y-2">
-              {tasks.map(t => (
-                <div key={t.id} className="flex items-center justify-between py-2 border-b last:border-0">
+              {tasks.map(tk => (
+                <div key={tk.id} className="flex items-center justify-between py-2 border-b last:border-0">
                   <div>
-                    <p className={`text-sm font-medium ${t.status === 'completed' ? 'line-through text-muted-foreground' : 'text-[#1A2B3C]'}`}>{t.title}</p>
-                    {t.description && <p className="text-xs text-muted-foreground">{t.description}</p>}
+                    <p className={`text-sm font-medium ${tk.status === 'completed' ? 'line-through text-muted-foreground' : 'text-[#1A2B3C]'}`}>{tk.title}</p>
+                    {tk.description && <p className="text-xs text-muted-foreground">{tk.description}</p>}
                     <div className="flex gap-3 mt-0.5">
-                      {t.due_date && <p className="text-xs text-muted-foreground">Due {new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>}
-                      {t.assigned_to && <p className="text-xs text-muted-foreground">👤 {getMember(t.assigned_to)}</p>}
+                      {tk.due_date && <p className="text-xs text-muted-foreground">{t('tasks.due')} {new Date(tk.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>}
+                      {tk.assigned_to && <p className="text-xs text-muted-foreground">👤 {getMember(tk.assigned_to)}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2 ml-4 shrink-0">
-                    <span className={`text-xs font-medium ${priorityColor(t.priority)}`}>{t.priority}</span>
-                    <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{statusLabel(t.status)}</span>
-                    <button onClick={() => openEditTask(t)} className="text-xs text-[#0D9488] hover:underline">Edit</button>
-                    <button onClick={() => deleteTask(t.id)} className="text-xs text-[#DC2626] hover:underline">Delete</button>
+                    <span className={`text-xs font-medium ${priorityColor(tk.priority)}`}>{tk.priority}</span>
+                    <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{statusLabel(tk.status)}</span>
+                    <button onClick={() => openEditTask(tk)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                    <button onClick={() => deleteTask(tk.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
                   </div>
                 </div>
               ))}
@@ -355,13 +371,13 @@ export default function DashboardPage() {
         </section>
 
         <p className="text-xs text-center text-muted-foreground pb-4">
-          Kinto Care is a logistics and coordination tool. No medical diagnosis provided.
+          {t('common.disclaimer')}
         </p>
       </main>
 
       {/* Appointment Modal */}
       {apptModal && (
-        <Modal title={apptModal === 'add' ? 'New Appointment' : 'Edit Appointment'} onClose={() => setApptModal(null)}>
+        <Modal title={apptModal === 'add' ? t('nav.appointments') : t('common.edit')} onClose={() => setApptModal(null)}>
           <Field label="Doctor / Provider">
             <input className={inputCls} value={apptForm.doctor_name ?? ''} onChange={e => setApptForm(p => ({ ...p, doctor_name: e.target.value }))} placeholder="Dr. Rodriguez" />
           </Field>
@@ -371,26 +387,23 @@ export default function DashboardPage() {
           <Field label="Date & Time">
             <input className={inputCls} type="datetime-local" value={apptForm.date_time ? apptForm.date_time.slice(0, 16) : ''} onChange={e => setApptForm(p => ({ ...p, date_time: e.target.value }))} />
           </Field>
-          <Field label="Location">
-            <input className={inputCls} value={apptForm.location ?? ''} onChange={e => setApptForm(p => ({ ...p, location: e.target.value }))} placeholder="Tampa General Hospital" />
-          </Field>
-          <Field label="Notes">
+          <Field label={t('contacts.notes')}>
             <textarea className={inputCls} rows={3} value={apptForm.notes ?? ''} onChange={e => setApptForm(p => ({ ...p, notes: e.target.value }))} placeholder="Post-op check, bring MRI scans…" />
           </Field>
-          <SaveBtn saving={saving} onSave={saveAppt} onCancel={() => setApptModal(null)} />
+          <SaveBtn saving={saving} onSave={saveAppt} onCancel={() => setApptModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
       )}
 
       {/* Medication Modal */}
       {medModal && (
-        <Modal title={medModal === 'add' ? 'New Medication' : 'Edit Medication'} onClose={() => setMedModal(null)}>
-          <Field label="Medication Name">
+        <Modal title={medModal === 'add' ? t('medications.title') : t('common.edit')} onClose={() => setMedModal(null)}>
+          <Field label={t('medications.medicationName')}>
             <input className={inputCls} value={medForm.name ?? ''} onChange={e => setMedForm(p => ({ ...p, name: e.target.value }))} placeholder="Metoprolol 25mg" />
           </Field>
-          <Field label="Dosage">
+          <Field label={t('medications.dosage')}>
             <input className={inputCls} value={medForm.dosage ?? ''} onChange={e => setMedForm(p => ({ ...p, dosage: e.target.value }))} placeholder="1 tablet" />
           </Field>
-          <Field label="Frequency">
+          <Field label={t('medications.frequency')}>
             <select className={inputCls} value={medForm.frequency ?? ''} onChange={e => setMedForm(p => ({ ...p, frequency: e.target.value }))}>
               <option value="">Select…</option>
               <option>Daily</option>
@@ -399,53 +412,70 @@ export default function DashboardPage() {
               <option>Weekly</option>
             </select>
           </Field>
-          <Field label="Instructions">
+          <Field label={t('medications.instructions') ?? 'Instructions'}>
             <textarea className={inputCls} rows={2} value={(medForm as any).instructions ?? ''} onChange={e => setMedForm(p => ({ ...p, instructions: e.target.value }))} placeholder="Take with food…" />
           </Field>
           <div className="text-xs bg-amber-50 text-amber-800 rounded-lg px-3 py-2">
-            ⚠️ Kinto Care is a logistics tool only. No medical advice provided.
+            ⚠️ {t('medications.disclaimer')}
           </div>
-          <SaveBtn saving={saving} onSave={saveMed} onCancel={() => setMedModal(null)} />
+          <SaveBtn saving={saving} onSave={saveMed} onCancel={() => setMedModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
       )}
 
       {/* Task Modal */}
       {taskModal && (
-        <Modal title={taskModal === 'add' ? 'New Task' : 'Edit Task'} onClose={() => setTaskModal(null)}>
-          <Field label="Title">
-            <input className={inputCls} value={taskForm.title ?? ''} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder="Pick up prescription" />
+        <Modal title={taskModal === 'add' ? t('tasks.createNewTask') : t('common.edit')} onClose={() => setTaskModal(null)}>
+          <Field label={t('tasks.taskTitle')}>
+            <input className={inputCls} value={taskForm.title ?? ''} onChange={e => setTaskForm(p => ({ ...p, title: e.target.value }))} placeholder={t('tasks.titlePlaceholder')} />
           </Field>
-          <Field label="Description">
+          <Field label={t('tasks.description')}>
             <textarea className={inputCls} rows={2} value={taskForm.description ?? ''} onChange={e => setTaskForm(p => ({ ...p, description: e.target.value }))} />
           </Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Priority">
+            <Field label={t('tasks.priority')}>
               <select className={inputCls} value={taskForm.priority ?? 'medium'} onChange={e => setTaskForm(p => ({ ...p, priority: e.target.value }))}>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
+                <option value="high">{t('tasks.high')}</option>
+                <option value="medium">{t('tasks.medium')}</option>
+                <option value="low">{t('tasks.low')}</option>
               </select>
             </Field>
-            <Field label="Status">
+            <Field label={t('tasks.status')}>
               <select className={inputCls} value={taskForm.status ?? 'pending'} onChange={e => setTaskForm(p => ({ ...p, status: e.target.value }))}>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
+                <option value="pending">{t('tasks.pending')}</option>
+                <option value="in_progress">{t('tasks.inProgress')}</option>
+                <option value="completed">{t('tasks.completed')}</option>
+                <option value="cancelled">{t('common.cancel')}</option>
               </select>
             </Field>
           </div>
-          <Field label="Assign To">
+          <Field label={t('tasks.assignTo')}>
             <select className={inputCls} value={taskForm.assigned_to ?? ''} onChange={e => setTaskForm(p => ({ ...p, assigned_to: e.target.value }))}>
-              <option value="">Unassigned</option>
+              <option value="">{t('tasks.unassigned')}</option>
               {FAMILY_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </Field>
-          <Field label="Due Date">
+          <Field label={t('tasks.dueDate')}>
             <input className={inputCls} type="date" value={taskForm.due_date ?? ''} onChange={e => setTaskForm(p => ({ ...p, due_date: e.target.value }))} />
           </Field>
-          <SaveBtn saving={saving} onSave={saveTask} onCancel={() => setTaskModal(null)} />
+          <SaveBtn saving={saving} onSave={saveTask} onCancel={() => setTaskModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
+      )}
+
+      {/* KintoScan Modal */}
+      {scanModal && (
+        <KintoScan
+          hubId={hubId}
+          onClose={() => setScanModal(false)}
+          onSave={async (med) => {
+            await supabase.from('medications').insert({
+              ...med,
+              hub_id: hubId,
+              is_active: true,
+            })
+            setScanModal(false)
+            await loadData()
+          }}
+        />
       )}
     </div>
   )
