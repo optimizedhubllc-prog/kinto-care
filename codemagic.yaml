@@ -24,15 +24,13 @@ workflows:
           pod install
       - name: Initialize keychain
         script: keychain initialize
-      - name: Create certificate and profile
+      - name: Create signing certificate
         script: |
-          app-store-connect certificates create \
-            --type IOS_DISTRIBUTION \
-            --private-key-save-to /tmp/private_key.pem
+          openssl genrsa -out /tmp/key.pem 2048
           app-store-connect fetch-signing-files $BUNDLE_ID \
             --type IOS_APP_STORE \
             --create \
-            --certificate-key /tmp/private_key.pem
+            --private-key /tmp/key.pem
       - name: Add certificate to keychain
         script: keychain add-certificates
       - name: Apply signing profile
