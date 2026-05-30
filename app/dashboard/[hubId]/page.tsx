@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Heart, Users, Calendar, Pill, CheckSquare, LogOut, Plus, X } from 'lucide-react'
+import { Users, Calendar, Pill, CheckSquare, LogOut, Plus, X } from 'lucide-react'
+import { KintoLogo } from '@/components/ui/KintoLogo'
 import { useTranslation } from '@/hooks/useTranslation'
 import { KintoScan } from '@/components/ui/KintoScan'
 
@@ -207,8 +208,7 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FDF8F2]">
         <div className="flex items-center gap-2">
-          <Heart className="h-6 w-6 text-[#DC2626] animate-pulse" strokeWidth={1.5} />
-          <span className="text-[#1A2B3C] font-serif">{t('common.loading')}</span>
+          <KintoLogo size="sm" />
         </div>
       </div>
     )
@@ -226,8 +226,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-[#FDF8F2]">
       <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Heart className="h-6 w-6 text-[#DC2626]" strokeWidth={1.5} />
-          <span className="text-xl font-serif font-semibold text-[#1A2B3C]">Kinto Care</span>
+          <KintoLogo size="sm" />
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-muted-foreground">Care hub for <strong className="text-[#1A2B3C]">{patientName}</strong></span>
