@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Heart, Users, Calendar, Pill, CheckSquare, LogOut, Plus, X } from 'lucide-react'
 import { useTranslation } from '@/hooks/useTranslation'
+import { KintoScan } from '@/components/ui/KintoScan'
 
 type HubMember = { id: string; user_id: string; role: string; users: { name: string | null; email: string | null } | null }
 type Appointment = { id: string; doctor_name: string | null; specialty: string | null; date_time: string; location: string | null; notes: string | null }
@@ -80,6 +81,7 @@ export default function DashboardPage() {
   const [apptModal, setApptModal] = useState<null | 'add' | Appointment>(null)
   const [medModal, setMedModal] = useState<null | 'add' | Medication>(null)
   const [taskModal, setTaskModal] = useState<null | 'add' | Task>(null)
+  const [scanModal, setScanModal] = useState(false)
 
   // Form state
   const [apptForm, setApptForm] = useState<Partial<Appointment>>({})
@@ -302,6 +304,12 @@ export default function DashboardPage() {
             <Pill className="h-5 w-5 text-[#0D9488]" />
             <h2 className="font-semibold text-[#1A2B3C]">{t('nav.medications')}</h2>
             <span className="ml-auto text-xs text-muted-foreground mr-3">{medications.length} {t('medications.title').toLowerCase()}</span>
+            <button
+              onClick={() => setScanModal(true)}
+              className="flex items-center gap-1 text-xs bg-[#0D9488] text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-semibold mr-2"
+            >
+              {t('medications.scanLabel')}
+            </button>
             <button onClick={openAddMed} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
               <Plus className="h-3 w-3" />{t('common.add')}
             </button>
@@ -451,6 +459,23 @@ export default function DashboardPage() {
           </Field>
           <SaveBtn saving={saving} onSave={saveTask} onCancel={() => setTaskModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
+      )}
+
+      {/* KintoScan Modal */}
+      {scanModal && (
+        <KintoScan
+          hubId={hubId}
+          onClose={() => setScanModal(false)}
+          onSave={async (med) => {
+            await supabase.from('medications').insert({
+              ...med,
+              hub_id: hubId,
+              is_active: true,
+            })
+            setScanModal(false)
+            await loadData()
+          }}
+        />
       )}
     </div>
   )
