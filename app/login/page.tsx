@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Heart, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import { KintoLogo } from "@/components/ui/KintoLogo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -20,9 +21,7 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-
     if (error) {
       setError(error.message);
       setLoading(false);
@@ -35,12 +34,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F2] px-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Heart className="h-8 w-8 text-[#DC2626]" strokeWidth={1.5} />
-          <span className="text-2xl font-serif font-semibold text-[#1A2B3C]">Kinto Care</span>
+        <div className="flex items-center justify-center mb-8">
+          <KintoLogo size="lg" />
         </div>
-
         <Card>
           <CardHeader>
             <CardTitle>Welcome back</CardTitle>
@@ -70,5 +66,4 @@ export default function LoginPage() {
     </div>
   );
 }
-
 export const dynamic = 'force-dynamic';
