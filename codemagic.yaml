@@ -28,10 +28,11 @@ workflows:
         script: |
           app-store-connect certificates create \
             --type IOS_DISTRIBUTION \
-            --save
+            --private-key-save-to /tmp/private_key.pem
           app-store-connect fetch-signing-files $BUNDLE_ID \
             --type IOS_APP_STORE \
-            --create
+            --create \
+            --certificate-key /tmp/private_key.pem
       - name: Add certificate to keychain
         script: keychain add-certificates
       - name: Apply signing profile
