@@ -20,6 +20,7 @@ workflows:
       - name: Install CocoaPods
         script: |
           cd ios/App
+          pod init
           pod install
       - name: Set up keychain
         script: keychain initialize
