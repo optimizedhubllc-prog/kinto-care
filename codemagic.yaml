@@ -1,0 +1,6 @@
+workflows: 
+  ios-distribution: 
+    name: Kinto Care iOS 
+    max_build_duration: 60 
+    environment: 
+      ios_signing: 
