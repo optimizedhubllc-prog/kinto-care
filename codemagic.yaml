@@ -26,8 +26,9 @@ workflows:
         script: keychain initialize
       - name: Create certificate and profile
         script: |
-          app-store-connect create-certificate \
-            --type IOS_DISTRIBUTION
+          app-store-connect certificates create \
+            --type IOS_DISTRIBUTION \
+            --save
           app-store-connect fetch-signing-files $BUNDLE_ID \
             --type IOS_APP_STORE \
             --create
