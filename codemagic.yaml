@@ -5,12 +5,10 @@ workflows:
     integrations:
       app_store_connect: Codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.kintocare.app
       vars:
-        XCODE_PROJECT: "ios/App/App.xcodeproj"
-        XCODE_SCHEME: "App"
+        BUNDLE_ID: com.kintocare.app
+        XCODE_PROJECT: ios/App/App.xcodeproj
+        XCODE_SCHEME: App
       node: v22.11.0
       xcode: latest
       cocoapods: default
@@ -24,16 +22,26 @@ workflows:
           cd ios/App
           pod init
           pod install
-      - name: Set up code signing
+      - name: Initialize keychain
+        script: keychain initialize
+      - name: Create certificate and profile
+        script: |
+          app-store-connect create-certificate \
+            --type IOS_DISTRIBUTION
+          app-store-connect fetch-signing-files $BUNDLE_ID \
+            --type IOS_APP_STORE \
+            --create
+      - name: Add certificate to keychain
+        script: keychain add-certificates
+      - name: Apply signing profile
         script: xcode-project use-profiles
-      - name: Build iOS
+      - name: Build IPA
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
         auth: integration
