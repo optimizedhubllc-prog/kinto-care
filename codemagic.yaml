@@ -8,9 +8,6 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.kintocare.app
-      vars:
-        XCODE_PROJECT: "ios/App/App.xcodeproj"
-        XCODE_SCHEME: "App"
       node: v22.11.0
       xcode: latest
       cocoapods: default
@@ -31,6 +28,9 @@ workflows:
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
+    vars:
+      XCODE_PROJECT: "ios/App/App.xcodeproj"
+      XCODE_SCHEME: "App"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
