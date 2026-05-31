@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Heart } from 'lucide-react'
+import { KintoLogo } from '@/components/ui/KintoLogo'
 
 export default function OnboardingPage() {
   const [patientName, setPatientName] = useState('')
@@ -62,9 +62,8 @@ export default function OnboardingPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#FDF8F2] px-4">
       <div className="w-full max-w-md">
 
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Heart className="h-8 w-8 text-[#DC2626]" strokeWidth={1.5} />
-          <span className="text-2xl font-serif font-semibold text-[#1A2B3C]">Kinto Care</span>
+        <div className="flex items-center justify-center mb-8">
+          <KintoLogo size="lg" />
         </div>
 
         <div className="bg-card rounded-xl border shadow-sm p-6">

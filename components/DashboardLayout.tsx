@@ -28,8 +28,8 @@ import { CSSProperties, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { DashboardLayoutSkeleton } from './DashboardLayoutSkeleton';
 import { Button } from "./ui/button";
+import { KintoLogo } from "./ui/KintoLogo";
 
-// Menu items - will be filtered based on user role
 const allMenuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", key: "nav.dashboard" },
   { icon: Users, label: "Tasks", path: "/tasks", key: "nav.tasks" },
@@ -52,8 +52,6 @@ export default function DashboardLayout({
   });
   const { loading, user } = useAuth();
   const { t, language } = useTranslation();
-
-
 
   useEffect(() => {
     localStorage.setItem(SIDEBAR_WIDTH_KEY, sidebarWidth.toString());
@@ -121,13 +119,11 @@ function DashboardLayoutContent({
   const isCollapsed = state === "collapsed";
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
-  
-  // Filter menu items for caregiver role (check hub_member role, not user role)
+
   const getMenuItems = () => {
-    // For now, show all items - caregiver role filtering is done at hub_member level
     return allMenuItems;
   };
-  
+
   const menuItems = getMenuItems();
   const activeMenuItem = menuItems.find((item: any) => item.path === location);
   const isMobile = useIsMobile();
@@ -141,7 +137,6 @@ function DashboardLayoutContent({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-
       const sidebarLeft = sidebarRef.current?.getBoundingClientRect().left ?? 0;
       const newWidth = e.clientX - sidebarLeft;
       if (newWidth >= MIN_WIDTH && newWidth <= MAX_WIDTH) {
@@ -186,14 +181,7 @@ function DashboardLayoutContent({
                 <PanelLeft className="h-4 w-4 text-muted-foreground" />
               </button>
               {!isCollapsed ? (
-                <div className="flex items-center gap-2 min-w-0">
-                  {/* Kinto Care Heart Logo - SOP v1.2 */}
-                  <img 
-                    src="https://d2xsxph8kpxj0f.cloudfront.net/310519663129010374/QJ3E2r9gCPZv4t7YHdCX6w/kinto-care-logo-sop-v1.2-axWCEe4rP9rfBvTTQ26hhN.webp" 
-                    alt="Kinto Care" 
-                    className="h-8 w-auto"
-                  />
-                </div>
+                <KintoLogo size="sm" />
               ) : null}
             </div>
           </SidebarHeader>
@@ -269,12 +257,8 @@ function DashboardLayoutContent({
           <div className="flex border-b h-14 items-center justify-between bg-background/95 px-2 backdrop-blur supports-[backdrop-filter]:backdrop-blur sticky top-0 z-40">
             <div className="flex items-center gap-2">
               <SidebarTrigger className="h-9 w-9 rounded-lg bg-background" />
-              <div className="flex items-center gap-3">
-                <div className="flex flex-col gap-1">
-                  <span className="tracking-tight text-foreground">
-                    {activeMenuItem?.label ?? "Menu"}
-                  </span>
-                </div>
+              <div className="flex items-center gap-2">
+                <KintoLogo size="sm" />
               </div>
             </div>
           </div>
