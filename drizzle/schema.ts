@@ -64,6 +64,24 @@ export type HubMember = typeof hubMembers.$inferSelect;
 export type InsertHubMember = typeof hubMembers.$inferInsert;
 
 // ============================================================================
+// Hub Invites — token-based, redeemed via the redeem_invite() Postgres RPC
+// ============================================================================
+export const hubInvites = pgTable("hub_invites", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  hubId: uuid("hub_id").notNull().references(() => patientHubs.id, { onDelete: "cascade" }),
+  role: hubMemberRoleEnum("role").default("family_viewer").notNull(),
+  token: text("token").notNull(),
+  invitedEmail: varchar("invited_email", { length: 320 }),
+  createdBy: uuid("created_by").references(() => users.id),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  redeemedBy: uuid("redeemed_by").references(() => users.id),
+  redeemedAt: timestamp("redeemed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+export type HubInvite = typeof hubInvites.$inferSelect;
+export type InsertHubInvite = typeof hubInvites.$inferInsert;
+
+// ============================================================================
 // Medical Contacts
 // ============================================================================
 export const medicalContacts = pgTable("medical_contacts", {
