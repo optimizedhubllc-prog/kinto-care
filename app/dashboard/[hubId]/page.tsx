@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Users, Calendar, Pill, CheckSquare, LogOut, Plus, X, Clock, AlertTriangle, FileText, MessageCircle, ChevronDown, ChevronUp, Send, Share2, ExternalLink } from 'lucide-react'
+import { Users, Calendar, Pill, CheckSquare, LogOut, Plus, X, Clock, AlertTriangle, FileText, MessageCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Send, Share2, ExternalLink, Siren } from 'lucide-react'
 import { KintoLogo } from '@/components/ui/KintoLogo'
 import { useTranslation } from '@/hooks/useTranslation'
 import { KintoScan } from '@/components/ui/KintoScan'
@@ -21,6 +21,7 @@ type EmergencyInfo = {
 type DocumentItem = { id: string; name: string; category: string; file_url: string | null; notes: string | null; created_at: string }
 type TaskComment = { id: string; task_id: string; author_id: string | null; comment: string; created_at: string }
 type ContactItem = { id: string; name: string; role: string; phone: string; country_code: string; language_preference: string; notes: string | null }
+type Shift = { id: string; caregiver_id: string | null; start_time: string; end_time: string; task_notes: string | null }
 
 const FAMILY_MEMBERS = [
   { id: "89a84765-2f2f-4c77-a184-1ea044c1f5b5", name: "Pedro Jaime" },
@@ -88,9 +89,11 @@ export default function DashboardPage() {
   const [emergencyInfo, setEmergencyInfo] = useState<EmergencyInfo | null>(null)
   const [documents, setDocuments] = useState<DocumentItem[]>([])
   const [contacts, setContacts] = useState<ContactItem[]>([])
+  const [shifts, setShifts] = useState<Shift[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [contactError, setContactError] = useState<string | null>(null)
+  const [calendarError, setCalendarError] = useState<string | null>(null)
 
   // Modal state
   const [apptModal, setApptModal] = useState<null | 'add' | Appointment>(null)
@@ -100,6 +103,11 @@ export default function DashboardPage() {
   const [emergencyModal, setEmergencyModal] = useState(false)
   const [docModal, setDocModal] = useState(false)
   const [contactModal, setContactModal] = useState<null | 'add' | ContactItem>(null)
+  const [shiftModal, setShiftModal] = useState<null | 'add' | Shift>(null)
+
+  // Calendar navigation
+  const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d })
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
   // Form state
   const [apptForm, setApptForm] = useState<Partial<Appointment>>({})
@@ -108,6 +116,7 @@ export default function DashboardPage() {
   const [emergencyForm, setEmergencyForm] = useState<Partial<EmergencyInfo>>({})
   const [docForm, setDocForm] = useState<Partial<DocumentItem>>({ category: 'other' })
   const [contactForm, setContactForm] = useState<Partial<ContactItem>>({ country_code: 'US', language_preference: 'en' })
+  const [shiftForm, setShiftForm] = useState<Partial<Shift>>({})
   const [saving, setSaving] = useState(false)
 
   // Task comments (loaded on-demand per task)
@@ -122,7 +131,7 @@ export default function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const [hubRes, membersRes, apptRes, medsRes, tasksRes, activityRes, emergencyRes, docsRes, contactsRes] = await Promise.all([
+    const [hubRes, membersRes, apptRes, medsRes, tasksRes, activityRes, emergencyRes, docsRes, contactsRes, shiftsRes] = await Promise.all([
       supabase.from('patient_hubs').select('patient_name').eq('id', hubId).single(),
       supabase.from('hub_members').select('id, user_id, role, users(name, email)').eq('hub_id', hubId),
       supabase.from('appointments').select('id, doctor_name, specialty, date_time, location, notes').eq('hub_id', hubId).order('date_time', { ascending: true }),
@@ -132,6 +141,7 @@ export default function DashboardPage() {
       supabase.from('emergency_info').select('*').eq('hub_id', hubId).maybeSingle(),
       supabase.from('documents').select('id, name, category, file_url, notes, created_at').eq('hub_id', hubId).order('created_at', { ascending: false }),
       supabase.from('contacts').select('id, name, role, phone, country_code, language_preference, notes').eq('hub_id', hubId).order('name', { ascending: true }),
+      supabase.from('care_logistics').select('id, caregiver_id, start_time, end_time, task_notes').eq('hub_id', hubId).order('start_time', { ascending: true }),
     ])
 
     if (hubRes.error) { setError('Could not load hub.'); setLoading(false); return }
@@ -144,6 +154,7 @@ export default function DashboardPage() {
     setEmergencyInfo(emergencyRes.data ?? null)
     setDocuments(docsRes.data ?? [])
     setContacts(contactsRes.data ?? [])
+    setShifts(shiftsRes.data ?? [])
     setLoading(false)
   }, [hubId, router, supabase])
 
@@ -303,6 +314,71 @@ export default function DashboardPage() {
     return map[role] ?? role
   }
 
+  // Notify Family — opens native SMS compose pre-filled with all family contacts + a starter message
+  const notifyFamily = () => {
+    const familyContacts = contacts.filter(c => c.role === 'family_member' && c.phone?.trim())
+    if (familyContacts.length === 0) {
+      setCalendarError(t('emergency.noFamilyContacts'))
+      return
+    }
+    const numbers = familyContacts.map(c => c.phone.replace(/[^\d+]/g, ''))
+    const message = `${patientName ? patientName + ': ' : ''}${t('emergency.notifyMessage')}`
+    const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const separator = isIOS ? ',' : ';'
+    const prefix = isIOS ? '&' : '?'
+    window.location.href = `sms:${numbers.join(separator)}${prefix}body=${encodeURIComponent(message)}`
+  }
+
+  // Care Calendar (shifts)
+  const openAddShift = (day?: Date) => {
+    const base = day ?? new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const dateStr = `${base.getFullYear()}-${pad(base.getMonth() + 1)}-${pad(base.getDate())}`
+    setShiftForm({ start_time: `${dateStr}T09:00`, end_time: `${dateStr}T17:00` } as unknown as Partial<Shift>)
+    setCalendarError(null)
+    setShiftModal('add')
+  }
+  const openEditShift = (s: Shift) => { setShiftForm(s); setCalendarError(null); setShiftModal(s) }
+  const saveShift = async () => {
+    setSaving(true)
+    try {
+      if (!shiftForm.caregiver_id) { setCalendarError(t('calendar.caregiverRequired')); setSaving(false); return }
+      if (!shiftForm.start_time || !shiftForm.end_time) { setCalendarError(t('calendar.timesRequired')); setSaving(false); return }
+      const payload = { caregiver_id: shiftForm.caregiver_id, start_time: new Date(shiftForm.start_time).toISOString(), end_time: new Date(shiftForm.end_time).toISOString(), task_notes: shiftForm.task_notes ?? null }
+      const result = shiftModal === 'add'
+        ? await supabase.from('care_logistics').insert({ ...payload, hub_id: hubId })
+        : await supabase.from('care_logistics').update(payload).eq('id', (shiftModal as Shift).id)
+      if (result.error) { setCalendarError(result.error.message); setSaving(false); return }
+      setShiftModal(null)
+      setCalendarError(null)
+      await loadData()
+    } catch (e) { console.error(e); setCalendarError(e instanceof Error ? e.message : 'Failed to save shift') }
+    setSaving(false)
+  }
+  const deleteShift = async (id: string) => {
+    const { error: delError } = await supabase.from('care_logistics').delete().eq('id', id)
+    if (delError) { setCalendarError(delError.message); return }
+    setSelectedDay(null)
+    await loadData()
+  }
+  const shiftsOnDay = (day: Date) => shifts.filter(s => {
+    const d = new Date(s.start_time)
+    return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate()
+  })
+  const calendarDays = (() => {
+    const year = calendarMonth.getFullYear()
+    const month = calendarMonth.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const startOffset = firstDay.getDay() // 0=Sun
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    const cells: (Date | null)[] = []
+    for (let i = 0; i < startOffset; i++) cells.push(null)
+    for (let d = 1; d <= daysInMonth; d++) cells.push(new Date(year, month, d))
+    return cells
+  })()
+  const isToday = (d: Date) => { const t = new Date(); return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate() }
+  const formatShiftTime = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+
   // Task Comments
   const toggleTaskComments = async (taskId: string) => {
     if (expandedTask === taskId) { setExpandedTask(null); return }
@@ -427,48 +503,86 @@ export default function DashboardPage() {
               {emergencyInfo.notes && <div className="col-span-2 sm:col-span-3"><p className="text-xs text-muted-foreground">{t('emergency.notes')}</p><p className="text-[#1A2B3C]">{emergencyInfo.notes}</p></div>}
             </div>
           )}
-        </section>
-
-        {/* Activity Feed */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('activity.title')}</h2>
-          </div>
-          {activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('activity.empty')}</p>
-          ) : (
-            <div className="space-y-2">
-              {activity.map(a => (
-                <div key={a.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
-                  <p className="text-sm text-[#1A2B3C]">{a.description}</p>
-                  <span className="text-xs text-muted-foreground shrink-0 ml-3">{timeAgo(a.created_at)}</span>
-                </div>
-              ))}
+          <button onClick={notifyFamily} className="flex items-center justify-center gap-2 w-full mt-4 text-sm bg-[#DC2626] text-white px-4 py-2.5 rounded-lg hover:bg-red-700 font-semibold">
+            <Siren className="h-4 w-4" />{t('emergency.notifyFamily')}
+          </button>
+          {calendarError && !shiftModal && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-2">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {calendarError}
             </div>
           )}
         </section>
 
-        {/* Care Team */}
+        {/* Care Calendar */}
         <section className="bg-white rounded-xl border shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
-            <Users className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">Care Team</h2>
-            <span className="ml-auto text-xs text-muted-foreground">{members.length} member{members.length !== 1 ? 's' : ''}</span>
+            <Calendar className="h-5 w-5 text-[#0D9488]" />
+            <h2 className="font-semibold text-[#1A2B3C]">{t('calendar.title')}</h2>
+            <button onClick={() => openAddShift(selectedDay ?? undefined)} className="ml-auto flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+              <Plus className="h-3 w-3" />{t('calendar.logShift')}
+            </button>
           </div>
-          {members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No team members yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {members.map(m => (
-                <div key={m.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-[#1A2B3C]">{m.users?.name ?? m.users?.email ?? 'Unknown'}</p>
-                    <p className="text-xs text-muted-foreground">{m.users?.email}</p>
+          {calendarError && !shiftModal && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {calendarError}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mb-3">
+            <button onClick={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))} className="p-1 hover:bg-[#FDF8F2] rounded"><ChevronLeft className="h-4 w-4 text-[#1A2B3C]" /></button>
+            <p className="text-sm font-semibold text-[#1A2B3C]">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+            <button onClick={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))} className="p-1 hover:bg-[#FDF8F2] rounded"><ChevronRight className="h-4 w-4 text-[#1A2B3C]" /></button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+              <div key={i} className="text-xs text-muted-foreground font-semibold pb-1">{d}</div>
+            ))}
+            {calendarDays.map((day, i) => {
+              if (!day) return <div key={i} />
+              const dayShifts = shiftsOnDay(day)
+              const isSelected = selectedDay && day.getTime() === selectedDay.getTime()
+              return (
+                <button
+                  key={i}
+                  onClick={() => setSelectedDay(isSelected ? null : day)}
+                  className={`min-h-[3.5rem] rounded-lg border p-1 text-left transition-colors ${isToday(day) ? 'border-[#DC2626]' : 'border-transparent'} ${isSelected ? 'bg-[#FDF8F2]' : 'hover:bg-[#FDF8F2]'}`}
+                >
+                  <p className={`text-xs ${isToday(day) ? 'text-[#DC2626] font-bold' : 'text-[#1A2B3C]'}`}>{day.getDate()}</p>
+                  <div className="space-y-0.5 mt-0.5">
+                    {dayShifts.slice(0, 2).map(s => (
+                      <p key={s.id} className="text-[10px] leading-tight bg-teal-100 text-teal-800 rounded px-1 truncate">{getMember(s.caregiver_id) ?? '?'}</p>
+                    ))}
+                    {dayShifts.length > 2 && <p className="text-[10px] text-muted-foreground">+{dayShifts.length - 2}</p>}
                   </div>
-                  <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{roleLabel(m.role)}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {selectedDay && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-sm font-semibold text-[#1A2B3C] mb-2">{selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+              {shiftsOnDay(selectedDay).length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('calendar.noShifts')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {shiftsOnDay(selectedDay).map(s => (
+                    <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                      <div>
+                        <p className="text-sm font-medium text-[#1A2B3C]">{getMember(s.caregiver_id) ?? t('calendar.unknownCaregiver')}</p>
+                        <p className="text-xs text-muted-foreground">{formatShiftTime(s.start_time)} – {formatShiftTime(s.end_time)}{s.task_notes ? ` · ${s.task_notes}` : ''}</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4 shrink-0">
+                        <button onClick={() => openEditShift(s)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                        <button onClick={() => deleteShift(s.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              )}
             </div>
           )}
         </section>
@@ -502,6 +616,99 @@ export default function DashboardPage() {
                       <button onClick={() => deleteAppt(a.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
                     </div>
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Activity Feed */}
+        <section className="bg-white rounded-xl border shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="h-5 w-5 text-[#0D9488]" />
+            <h2 className="font-semibold text-[#1A2B3C]">{t('activity.title')}</h2>
+          </div>
+          {activity.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('activity.empty')}</p>
+          ) : (
+            <div className="space-y-2">
+              {activity.map(a => (
+                <div key={a.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                  <p className="text-sm text-[#1A2B3C]">{a.description}</p>
+                  <span className="text-xs text-muted-foreground shrink-0 ml-3">{timeAgo(a.created_at)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Tasks */}
+        <section className="bg-white rounded-xl border shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckSquare className="h-5 w-5 text-[#0D9488]" />
+            <h2 className="font-semibold text-[#1A2B3C]">{t('tasks.title')}</h2>
+            <span className="ml-auto text-xs text-muted-foreground mr-3">{tasks.filter(tk => tk.status !== 'completed').length} {t('tasks.pending').toLowerCase()}</span>
+            <button onClick={openAddTask} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+              <Plus className="h-3 w-3" />{t('common.add')}
+            </button>
+          </div>
+          {tasks.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('tasks.noTasks')}</p>
+          ) : (
+            <div className="space-y-2">
+              {tasks.map(tk => (
+                <div key={tk.id} className="py-2 border-b last:border-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm font-medium ${tk.status === 'completed' ? 'line-through text-muted-foreground' : 'text-[#1A2B3C]'}`}>{tk.title}</p>
+                      {tk.description && <p className="text-xs text-muted-foreground">{tk.description}</p>}
+                      <div className="flex gap-3 mt-0.5">
+                        {tk.due_date && <p className="text-xs text-muted-foreground">{t('tasks.due')} {new Date(tk.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>}
+                        {tk.assigned_to && <p className="text-xs text-muted-foreground">👤 {getMember(tk.assigned_to)}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4 shrink-0">
+                      <span className={`text-xs font-medium ${priorityColor(tk.priority)}`}>{tk.priority}</span>
+                      <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{statusLabel(tk.status)}</span>
+                      <button onClick={() => toggleTaskComments(tk.id)} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
+                        <MessageCircle className="h-3 w-3" />
+                        {taskComments[tk.id]?.length ? taskComments[tk.id].length : ''}
+                        {expandedTask === tk.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                      </button>
+                      <button onClick={() => openEditTask(tk)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                      <button onClick={() => deleteTask(tk.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                    </div>
+                  </div>
+
+                  {expandedTask === tk.id && (
+                    <div className="mt-2 ml-1 pl-3 border-l-2 border-[#FDF8F2] space-y-2">
+                      {commentsLoading && !taskComments[tk.id] ? (
+                        <p className="text-xs text-muted-foreground">{t('common.loading')}</p>
+                      ) : (taskComments[tk.id]?.length ?? 0) === 0 ? (
+                        <p className="text-xs text-muted-foreground">{t('taskComments.noComments')}</p>
+                      ) : (
+                        taskComments[tk.id].map(c => (
+                          <div key={c.id} className="text-xs">
+                            <span className="font-medium text-[#1A2B3C]">{getMember(c.author_id) ?? 'Someone'}</span>
+                            <span className="text-muted-foreground ml-1">{timeAgo(c.created_at)}</span>
+                            <p className="text-[#1A2B3C]">{c.comment}</p>
+                          </div>
+                        ))
+                      )}
+                      <div className="flex gap-2 pt-1">
+                        <input
+                          className="flex-1 border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                          placeholder={t('taskComments.addComment')}
+                          value={commentDraft}
+                          onChange={e => setCommentDraft(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') postComment(tk.id) }}
+                        />
+                        <button onClick={() => postComment(tk.id)} className="text-xs bg-[#0D9488] text-white px-2 py-1 rounded-lg hover:bg-teal-700 flex items-center gap-1">
+                          <Send className="h-3 w-3" />{t('taskComments.post')}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -632,73 +839,24 @@ export default function DashboardPage() {
           )}
         </section>
 
-        {/* Tasks */}
+        {/* Care Team */}
         <section className="bg-white rounded-xl border shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
-            <CheckSquare className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('tasks.title')}</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{tasks.filter(tk => tk.status !== 'completed').length} {t('tasks.pending').toLowerCase()}</span>
-            <button onClick={openAddTask} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />{t('common.add')}
-            </button>
+            <Users className="h-5 w-5 text-[#0D9488]" />
+            <h2 className="font-semibold text-[#1A2B3C]">Care Team</h2>
+            <span className="ml-auto text-xs text-muted-foreground">{members.length} member{members.length !== 1 ? 's' : ''}</span>
           </div>
-          {tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('tasks.noTasks')}</p>
+          {members.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No team members yet.</p>
           ) : (
             <div className="space-y-2">
-              {tasks.map(tk => (
-                <div key={tk.id} className="py-2 border-b last:border-0">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm font-medium ${tk.status === 'completed' ? 'line-through text-muted-foreground' : 'text-[#1A2B3C]'}`}>{tk.title}</p>
-                      {tk.description && <p className="text-xs text-muted-foreground">{tk.description}</p>}
-                      <div className="flex gap-3 mt-0.5">
-                        {tk.due_date && <p className="text-xs text-muted-foreground">{t('tasks.due')} {new Date(tk.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>}
-                        {tk.assigned_to && <p className="text-xs text-muted-foreground">👤 {getMember(tk.assigned_to)}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4 shrink-0">
-                      <span className={`text-xs font-medium ${priorityColor(tk.priority)}`}>{tk.priority}</span>
-                      <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{statusLabel(tk.status)}</span>
-                      <button onClick={() => toggleTaskComments(tk.id)} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
-                        <MessageCircle className="h-3 w-3" />
-                        {taskComments[tk.id]?.length ? taskComments[tk.id].length : ''}
-                        {expandedTask === tk.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      </button>
-                      <button onClick={() => openEditTask(tk)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
-                      <button onClick={() => deleteTask(tk.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
-                    </div>
+              {members.map(m => (
+                <div key={m.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-[#1A2B3C]">{m.users?.name ?? m.users?.email ?? 'Unknown'}</p>
+                    <p className="text-xs text-muted-foreground">{m.users?.email}</p>
                   </div>
-
-                  {expandedTask === tk.id && (
-                    <div className="mt-2 ml-1 pl-3 border-l-2 border-[#FDF8F2] space-y-2">
-                      {commentsLoading && !taskComments[tk.id] ? (
-                        <p className="text-xs text-muted-foreground">{t('common.loading')}</p>
-                      ) : (taskComments[tk.id]?.length ?? 0) === 0 ? (
-                        <p className="text-xs text-muted-foreground">{t('taskComments.noComments')}</p>
-                      ) : (
-                        taskComments[tk.id].map(c => (
-                          <div key={c.id} className="text-xs">
-                            <span className="font-medium text-[#1A2B3C]">{getMember(c.author_id) ?? 'Someone'}</span>
-                            <span className="text-muted-foreground ml-1">{timeAgo(c.created_at)}</span>
-                            <p className="text-[#1A2B3C]">{c.comment}</p>
-                          </div>
-                        ))
-                      )}
-                      <div className="flex gap-2 pt-1">
-                        <input
-                          className="flex-1 border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
-                          placeholder={t('taskComments.addComment')}
-                          value={commentDraft}
-                          onChange={e => setCommentDraft(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') postComment(tk.id) }}
-                        />
-                        <button onClick={() => postComment(tk.id)} className="text-xs bg-[#0D9488] text-white px-2 py-1 rounded-lg hover:bg-teal-700 flex items-center gap-1">
-                          <Send className="h-3 w-3" />{t('taskComments.post')}
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                  <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{roleLabel(m.role)}</span>
                 </div>
               ))}
             </div>
@@ -908,6 +1066,36 @@ export default function DashboardPage() {
             <textarea className={inputCls} rows={2} value={docForm.notes ?? ''} onChange={e => setDocForm(p => ({ ...p, notes: e.target.value }))} />
           </Field>
           <SaveBtn saving={saving} onSave={saveDoc} onCancel={() => setDocModal(false)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
+        </Modal>
+      )}
+
+      {/* Shift Modal */}
+      {shiftModal && (
+        <Modal title={shiftModal === 'add' ? t('calendar.logShift') : t('common.edit')} onClose={() => setShiftModal(null)}>
+          {calendarError && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {calendarError}
+            </div>
+          )}
+          <Field label={t('calendar.caregiver')}>
+            <select className={inputCls} value={shiftForm.caregiver_id ?? ''} onChange={e => setShiftForm(p => ({ ...p, caregiver_id: e.target.value }))}>
+              <option value="">{t('calendar.selectCaregiver')}</option>
+              {FAMILY_MEMBERS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t('calendar.startTime')}>
+              <input className={inputCls} type="datetime-local" value={(shiftForm.start_time as unknown as string)?.slice(0, 16) ?? ''} onChange={e => setShiftForm(p => ({ ...p, start_time: e.target.value as unknown as string }))} />
+            </Field>
+            <Field label={t('calendar.endTime')}>
+              <input className={inputCls} type="datetime-local" value={(shiftForm.end_time as unknown as string)?.slice(0, 16) ?? ''} onChange={e => setShiftForm(p => ({ ...p, end_time: e.target.value as unknown as string }))} />
+            </Field>
+          </div>
+          <Field label={t('calendar.notes')}>
+            <textarea className={inputCls} rows={2} value={shiftForm.task_notes ?? ''} onChange={e => setShiftForm(p => ({ ...p, task_notes: e.target.value }))} placeholder={t('calendar.notesPlaceholder')} />
+          </Field>
+          <SaveBtn saving={saving} onSave={saveShift} onCancel={() => setShiftModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
       )}
 
