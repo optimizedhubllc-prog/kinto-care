@@ -36,6 +36,46 @@ function computeConfidence(extracted: Omit<ExtractedMedication, "confidence">): 
   return "low";
 }
 
+// Vercel Serverless Functions hard-cap request bodies at 4.5 MB. A raw phone
+// photo (often 3-8 MB) plus base64 overhead (~33%) blows past that silently —
+// the request gets rejected before our code (or its error logging) ever runs.
+// Downscaling + re-compressing client-side keeps the payload comfortably small
+// while leaving plenty of detail for OCR.
+const MAX_DIMENSION = 1600; // px, longest edge
+const JPEG_QUALITY = 0.82;
+
+function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const objectUrl = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
+        if (width > height) {
+          height = Math.round((height * MAX_DIMENSION) / width);
+          width = MAX_DIMENSION;
+        } else {
+          width = Math.round((width * MAX_DIMENSION) / height);
+          height = MAX_DIMENSION;
+        }
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      URL.revokeObjectURL(objectUrl);
+      if (!ctx) { reject(new Error("Canvas not supported")); return; }
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+      const base64 = dataUrl.split(",")[1];
+      if (!base64) { reject(new Error("Failed to encode image")); return; }
+      resolve(base64);
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Failed to load image")); };
+    img.src = objectUrl;
+  });
+}
+
 const inputCls = "w-full border rounded-lg px-3 py-2 text-sm text-[#1A2B3C] focus:outline-none focus:ring-2 focus:ring-[#0D9488]";
 
 // ============================================================================
@@ -64,8 +104,8 @@ export function KintoScan({ hubId, onSave, onClose }: KintoScanProps) {
       return;
     }
 
-    // Validate size (5 MB)
-    if (file.size > 5 * 1024 * 1024) {
+    // Sanity cap on the raw upload — actual payload gets downscaled below regardless
+    if (file.size > 20 * 1024 * 1024) {
       setError(t("medications.fileSizeError"));
       return;
     }
@@ -74,18 +114,14 @@ export function KintoScan({ hubId, onSave, onClose }: KintoScanProps) {
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
 
-    // Convert to base64
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const base64 = (e.target?.result as string).split(",")[1];
-      if (!base64) {
-        setError(t("medications.readFileError"));
-        return;
-      }
+    // Downscale + compress before sending — keeps the request well under
+    // Vercel's 4.5 MB body limit regardless of original photo size
+    try {
+      const base64 = await compressImage(file);
       await runExtraction(base64);
-    };
-    reader.onerror = () => setError(t("medications.readFileError"));
-    reader.readAsDataURL(file);
+    } catch (err) {
+      setError(t("medications.readFileError"));
+    }
   };
 
   // ── Claude Vision extraction ───────────────────────────────────────────────
@@ -103,7 +139,11 @@ export function KintoScan({ hubId, onSave, onClose }: KintoScanProps) {
         }),
       });
 
-      if (!response.ok) throw new Error("Extraction failed");
+      if (!response.ok) {
+        const errText = await response.text().catch(() => "");
+        console.error(`[KintoScan] extractFromImage failed (${response.status}):`, errText);
+        throw new Error("Extraction failed");
+      }
 
       const data = await response.json();
       const result = data?.result?.data?.json ?? data?.result?.data ?? data;
