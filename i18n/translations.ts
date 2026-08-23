@@ -261,6 +261,57 @@ export const translations = {
       saving: "Saving...",
       scanning: "Scanning...",
     },
+
+    // Activity Feed
+    activity: {
+      title: "Recent Activity",
+      empty: "No activity yet.",
+      viewMore: "View more",
+    },
+
+    // Emergency Info Card
+    emergency: {
+      title: "Emergency Info",
+      edit: "Edit",
+      setUp: "Set Up",
+      allergies: "Allergies",
+      bloodType: "Blood Type",
+      primaryDoctor: "Primary Doctor",
+      primaryDoctorPhone: "Doctor's Phone",
+      insuranceProvider: "Insurance Provider",
+      insuranceMemberId: "Insurance Member ID",
+      emergencyContactName: "Emergency Contact",
+      emergencyContactPhone: "Emergency Contact Phone",
+      notes: "Additional Notes",
+      empty: "No emergency info on file yet. Add it so it's ready when it matters.",
+      shareByText: "Share by Text",
+      lastUpdated: "Last updated",
+    },
+
+    // Document Vault
+    documents: {
+      title: "Documents",
+      empty: "No documents saved yet.",
+      addDocument: "Add Document",
+      name: "Document Name",
+      category: "Category",
+      link: "Link (optional)",
+      notes: "Notes",
+      categoryInsurance: "Insurance",
+      categoryPoa: "Power of Attorney",
+      categoryAdvanceDirective: "Advance Directive",
+      categoryId: "ID / Identification",
+      categoryOther: "Other",
+      openLink: "Open",
+    },
+
+    // Task Comments
+    taskComments: {
+      addComment: "Add a comment…",
+      post: "Post",
+      viewComments: "comments",
+      noComments: "No comments yet.",
+    },
   },
 
   es: {
@@ -515,6 +566,57 @@ export const translations = {
       characters: "caracteres",
       saving: "Guardando...",
       scanning: "Escaneando...",
+    },
+
+    // Activity Feed
+    activity: {
+      title: "Actividad Reciente",
+      empty: "Aún no hay actividad.",
+      viewMore: "Ver más",
+    },
+
+    // Emergency Info Card
+    emergency: {
+      title: "Información de Emergencia",
+      edit: "Editar",
+      setUp: "Configurar",
+      allergies: "Alergias",
+      bloodType: "Tipo de Sangre",
+      primaryDoctor: "Médico Principal",
+      primaryDoctorPhone: "Teléfono del Médico",
+      insuranceProvider: "Aseguradora",
+      insuranceMemberId: "Número de Miembro del Seguro",
+      emergencyContactName: "Contacto de Emergencia",
+      emergencyContactPhone: "Teléfono de Contacto de Emergencia",
+      notes: "Notas Adicionales",
+      empty: "Aún no hay información de emergencia registrada. Agrégala para tenerla lista cuando importe.",
+      shareByText: "Compartir por Mensaje",
+      lastUpdated: "Última actualización",
+    },
+
+    // Document Vault
+    documents: {
+      title: "Documentos",
+      empty: "Aún no hay documentos guardados.",
+      addDocument: "Agregar Documento",
+      name: "Nombre del Documento",
+      category: "Categoría",
+      link: "Enlace (opcional)",
+      notes: "Notas",
+      categoryInsurance: "Seguro",
+      categoryPoa: "Poder Notarial",
+      categoryAdvanceDirective: "Directiva Anticipada",
+      categoryId: "Identificación",
+      categoryOther: "Otro",
+      openLink: "Abrir",
+    },
+
+    // Task Comments
+    taskComments: {
+      addComment: "Agregar un comentario…",
+      post: "Publicar",
+      viewComments: "comentarios",
+      noComments: "Aún no hay comentarios.",
     },
   },
 };
