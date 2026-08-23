@@ -20,6 +20,7 @@ type EmergencyInfo = {
 }
 type DocumentItem = { id: string; name: string; category: string; file_url: string | null; notes: string | null; created_at: string }
 type TaskComment = { id: string; task_id: string; author_id: string | null; comment: string; created_at: string }
+type ContactItem = { id: string; name: string; role: string; phone: string; country_code: string; language_preference: string; notes: string | null }
 
 const FAMILY_MEMBERS = [
   { id: "89a84765-2f2f-4c77-a184-1ea044c1f5b5", name: "Pedro Jaime" },
@@ -86,6 +87,7 @@ export default function DashboardPage() {
   const [activity, setActivity] = useState<ActivityItem[]>([])
   const [emergencyInfo, setEmergencyInfo] = useState<EmergencyInfo | null>(null)
   const [documents, setDocuments] = useState<DocumentItem[]>([])
+  const [contacts, setContacts] = useState<ContactItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -96,6 +98,7 @@ export default function DashboardPage() {
   const [scanModal, setScanModal] = useState(false)
   const [emergencyModal, setEmergencyModal] = useState(false)
   const [docModal, setDocModal] = useState(false)
+  const [contactModal, setContactModal] = useState<null | 'add' | ContactItem>(null)
 
   // Form state
   const [apptForm, setApptForm] = useState<Partial<Appointment>>({})
@@ -103,6 +106,7 @@ export default function DashboardPage() {
   const [taskForm, setTaskForm] = useState<Partial<Task>>({})
   const [emergencyForm, setEmergencyForm] = useState<Partial<EmergencyInfo>>({})
   const [docForm, setDocForm] = useState<Partial<DocumentItem>>({ category: 'other' })
+  const [contactForm, setContactForm] = useState<Partial<ContactItem>>({ country_code: 'US', language_preference: 'en' })
   const [saving, setSaving] = useState(false)
 
   // Task comments (loaded on-demand per task)
@@ -117,7 +121,7 @@ export default function DashboardPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { router.push('/login'); return }
 
-    const [hubRes, membersRes, apptRes, medsRes, tasksRes, activityRes, emergencyRes, docsRes] = await Promise.all([
+    const [hubRes, membersRes, apptRes, medsRes, tasksRes, activityRes, emergencyRes, docsRes, contactsRes] = await Promise.all([
       supabase.from('patient_hubs').select('patient_name').eq('id', hubId).single(),
       supabase.from('hub_members').select('id, user_id, role, users(name, email)').eq('hub_id', hubId),
       supabase.from('appointments').select('id, doctor_name, specialty, date_time, location, notes').eq('hub_id', hubId).order('date_time', { ascending: true }),
@@ -126,6 +130,7 @@ export default function DashboardPage() {
       supabase.from('activity_log').select('id, action_type, entity_type, description, created_at, actor_id').eq('hub_id', hubId).order('created_at', { ascending: false }).limit(10),
       supabase.from('emergency_info').select('*').eq('hub_id', hubId).maybeSingle(),
       supabase.from('documents').select('id, name, category, file_url, notes, created_at').eq('hub_id', hubId).order('created_at', { ascending: false }),
+      supabase.from('contacts').select('id, name, role, phone, country_code, language_preference, notes').eq('hub_id', hubId).order('name', { ascending: true }),
     ])
 
     if (hubRes.error) { setError('Could not load hub.'); setLoading(false); return }
@@ -137,6 +142,7 @@ export default function DashboardPage() {
     setActivity(activityRes.data ?? [])
     setEmergencyInfo(emergencyRes.data ?? null)
     setDocuments(docsRes.data ?? [])
+    setContacts(contactsRes.data ?? [])
     setLoading(false)
   }, [hubId, router, supabase])
 
@@ -252,6 +258,37 @@ export default function DashboardPage() {
   const deleteDoc = async (id: string) => {
     await supabase.from('documents').delete().eq('id', id)
     await loadData()
+  }
+
+  // Contacts
+  const openAddContact = () => { setContactForm({ country_code: 'US', language_preference: 'en' }); setContactModal('add') }
+  const openEditContact = (c: ContactItem) => { setContactForm(c); setContactModal(c) }
+  const saveContact = async () => {
+    setSaving(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (contactModal === 'add') {
+        await supabase.from('contacts').insert({ ...contactForm, hub_id: hubId, created_by: user?.id })
+      } else {
+        await supabase.from('contacts').update(contactForm).eq('id', (contactModal as ContactItem).id)
+      }
+      setContactModal(null)
+      await loadData()
+    } catch (e) { console.error(e) }
+    setSaving(false)
+  }
+  const deleteContact = async (id: string) => {
+    await supabase.from('contacts').delete().eq('id', id)
+    await loadData()
+  }
+  const isIntlContact = (c: ContactItem) => c.country_code !== 'US'
+  const contactWhatsAppUrl = (c: ContactItem) => `https://wa.me/${c.phone.replace(/[^\d]/g, '')}`
+  const contactRoleLabel = (role: string) => {
+    const map: Record<string, string> = {
+      family_member: t('contacts.familyMember'), caregiver: t('contacts.caregiver'),
+      medical_facility: t('contacts.medicalFacility'), pharmacy: t('contacts.pharmacy'), other: t('contacts.other'),
+    }
+    return map[role] ?? role
   }
 
   // Task Comments
@@ -532,6 +569,51 @@ export default function DashboardPage() {
           )}
         </section>
 
+        {/* Contacts */}
+        <section className="bg-white rounded-xl border shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="h-5 w-5 text-[#0D9488]" />
+            <h2 className="font-semibold text-[#1A2B3C]">{t('contacts.title')}</h2>
+            <span className="ml-auto text-xs text-muted-foreground mr-3">{contacts.length}</span>
+            <button onClick={openAddContact} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+              <Plus className="h-3 w-3" />{t('common.add')}
+            </button>
+          </div>
+          {contacts.length === 0 ? (
+            <p className="text-sm text-muted-foreground">{t('contacts.noCaregivers')}</p>
+          ) : (
+            <div className="space-y-2">
+              {contacts.map(c => (
+                <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-[#1A2B3C]">{c.name}</p>
+                      <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{contactRoleLabel(c.role)}</span>
+                      {isIntlContact(c) && <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5">{t('contacts.international')}</span>}
+                    </div>
+                    {c.phone && <p className="text-xs text-muted-foreground font-mono mt-0.5">{c.phone}</p>}
+                    {c.notes && <p className="text-xs text-muted-foreground mt-0.5">{c.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-3 ml-4 shrink-0">
+                    {c.phone && isIntlContact(c) && (
+                      <a href={contactWhatsAppUrl(c)} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-2 py-1 rounded-lg hover:bg-green-600">
+                        {t('contacts.whatsapp')}
+                      </a>
+                    )}
+                    {c.phone && (
+                      <a href={`tel:${c.phone}`} className="text-xs bg-[#0D9488] text-white px-2 py-1 rounded-lg hover:bg-teal-700">
+                        {t('contacts.call')}
+                      </a>
+                    )}
+                    <button onClick={() => openEditContact(c)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                    <button onClick={() => deleteContact(c.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
         {/* Tasks */}
         <section className="bg-white rounded-xl border shadow-sm p-6">
           <div className="flex items-center gap-2 mb-4">
@@ -693,6 +775,50 @@ export default function DashboardPage() {
             <input className={inputCls} type="date" value={taskForm.due_date ?? ''} onChange={e => setTaskForm(p => ({ ...p, due_date: e.target.value }))} />
           </Field>
           <SaveBtn saving={saving} onSave={saveTask} onCancel={() => setTaskModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
+        </Modal>
+      )}
+
+      {/* Contact Modal */}
+      {contactModal && (
+        <Modal title={contactModal === 'add' ? t('contacts.addContact') : t('common.edit')} onClose={() => setContactModal(null)}>
+          <Field label={t('contacts.name')}>
+            <input className={inputCls} value={contactForm.name ?? ''} onChange={e => setContactForm(p => ({ ...p, name: e.target.value }))} placeholder={t('contacts.contactNamePlaceholder')} />
+          </Field>
+          <Field label={t('contacts.role')}>
+            <select className={inputCls} value={contactForm.role ?? 'family_member'} onChange={e => setContactForm(p => ({ ...p, role: e.target.value }))}>
+              <option value="family_member">{t('contacts.familyMember')}</option>
+              <option value="caregiver">{t('contacts.caregiver')}</option>
+              <option value="medical_facility">{t('contacts.medicalFacility')}</option>
+              <option value="pharmacy">{t('contacts.pharmacy')}</option>
+              <option value="other">{t('contacts.other')}</option>
+            </select>
+          </Field>
+          <Field label={`${t('contacts.phoneNumber')} (E.164 ${t('contacts.format')})`}>
+            <input className={inputCls} value={contactForm.phone ?? ''} onChange={e => setContactForm(p => ({ ...p, phone: e.target.value }))} placeholder="+18095551234" />
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label={t('contacts.country')}>
+              <select className={inputCls} value={contactForm.country_code ?? 'US'} onChange={e => setContactForm(p => ({ ...p, country_code: e.target.value }))}>
+                <option value="US">🇺🇸 United States</option>
+                <option value="DO">🇩🇴 Dominican Republic</option>
+                <option value="MX">🇲🇽 Mexico</option>
+                <option value="CA">🇨🇦 Canada</option>
+                <option value="PR">🇵🇷 Puerto Rico</option>
+                <option value="ES">🇪🇸 Spain</option>
+                <option value="GB">🇬🇧 United Kingdom</option>
+              </select>
+            </Field>
+            <Field label={t('contacts.languagePreference')}>
+              <select className={inputCls} value={contactForm.language_preference ?? 'en'} onChange={e => setContactForm(p => ({ ...p, language_preference: e.target.value }))}>
+                <option value="en">{t('common.english')}</option>
+                <option value="es">{t('common.spanish')}</option>
+              </select>
+            </Field>
+          </div>
+          <Field label={t('contacts.notes')}>
+            <textarea className={inputCls} rows={2} maxLength={280} value={contactForm.notes ?? ''} onChange={e => setContactForm(p => ({ ...p, notes: e.target.value }))} placeholder={t('contacts.notesPlaceholder')} />
+          </Field>
+          <SaveBtn saving={saving} onSave={saveContact} onCancel={() => setContactModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
       )}
 
