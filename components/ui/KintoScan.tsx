@@ -142,7 +142,17 @@ export function KintoScan({ hubId, onSave, onClose }: KintoScanProps) {
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
         console.error(`[KintoScan] extractFromImage failed (${response.status}):`, errText);
-        throw new Error("Extraction failed");
+        // Surface the actual server error message in the UI itself — the generic
+        // "Extraction failed" string was making this impossible to diagnose
+        // without direct server log access.
+        let detail = "";
+        try {
+          const parsed = JSON.parse(errText);
+          detail = parsed?.[0]?.error?.json?.message || parsed?.error?.json?.message || "";
+        } catch {
+          detail = errText.slice(0, 200);
+        }
+        throw new Error(detail ? `${t("medications.extractionFailed")}: ${detail}` : `${t("medications.extractionFailed")} (HTTP ${response.status})`);
       }
 
       const data = await response.json();
@@ -165,7 +175,7 @@ export function KintoScan({ hubId, onSave, onClose }: KintoScanProps) {
       });
       setStage("review");
     } catch (err) {
-      setError(t("medications.extractionFailed"));
+      setError(err instanceof Error ? err.message : t("medications.extractionFailed"));
       setStage("capture");
     }
   };
