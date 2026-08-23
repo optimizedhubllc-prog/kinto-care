@@ -4,7 +4,7 @@ import { router, publicProcedure, protectedProcedure, apiKeyProcedure } from "@/
 import { db } from "@/lib/db";
 import { hasPermission } from "@/server/apiKeyAuth";
 import {
-  users, patientHubs, hubMembers, medicalContacts,
+  users, patientHubs, hubMembers, hubInvites, medicalContacts,
   medications, appointments, careLogistics, webhookEvents, webhookLogs, tasks, contacts, apiKeys,
 } from "@/drizzle/schema";
 import { eq, and, desc, asc } from "drizzle-orm";
@@ -100,17 +100,31 @@ export const appRouter = router({
       }),
 
     generateInviteCode: protectedProcedure
-      .input(z.object({ hubId: z.string() }))
+      .input(z.object({ hubId: z.string(), role: z.enum(["family_admin", "family_viewer", "caregiver"]).default("family_viewer"), invitedEmail: z.string().email().optional() }))
       .mutation(async ({ input, ctx }) => {
         if (!await isUserFamilyAdmin(ctx.user.id, input.hubId)) throw new TRPCError({ code: "FORBIDDEN" });
-        return { inviteCode: Math.random().toString(36).substring(2, 8).toUpperCase(), hubId: input.hubId };
+        const token = crypto.randomBytes(16).toString("hex");
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+        await db.insert(hubInvites).values({
+          hubId: input.hubId,
+          role: input.role,
+          token,
+          invitedEmail: input.invitedEmail,
+          createdBy: ctx.user.id,
+          expiresAt,
+        });
+        return { inviteToken: token, hubId: input.hubId, expiresAt };
       }),
 
     joinWithCode: protectedProcedure
-      .input(z.object({ inviteCode: z.string().length(6), hubId: z.string() }))
+      .input(z.object({ inviteToken: z.string().min(1) }))
       .mutation(async ({ input, ctx }) => {
-        await db.insert(hubMembers).values({ hubId: input.hubId, userId: ctx.user.id, role: "family_viewer" });
-        return { success: true, hubId: input.hubId };
+        const supabase = await createClient();
+        const { data, error } = await supabase.rpc("redeem_invite", { p_token: input.inviteToken });
+        if (error) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: error.message || "Invalid or expired invite" });
+        }
+        return { success: true, hubId: data?.hub_id };
       }),
   }),
 
@@ -234,7 +248,7 @@ export const appRouter = router({
               "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-              model: "claude-sonnet-4-20250514",
+              model: "claude-sonnet-4-6",
               max_tokens: 1024,
               system: "You are a medication label OCR assistant. Extract medication information from images. Return ONLY valid JSON with fields: name (string), dosage (string), frequency (string), instructions (string). If any field cannot be determined, use null. Kinto Care is a logistics tool only — do not provide medical advice.",
               messages: [{
@@ -246,12 +260,28 @@ export const appRouter = router({
               }],
             }),
           });
+          if (!response.ok) {
+            const errBody = await response.text();
+            console.error(`[extractFromImage] Anthropic API error ${response.status}: ${errBody}`);
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Vision API request failed (${response.status})` });
+          }
           const data = await response.json();
           const content = data.content?.[0]?.text;
-          if (!content) throw new Error("No response from Claude");
-          const extracted = JSON.parse(content.replace(/```json|```/g, "").trim());
+          if (!content) {
+            console.error("[extractFromImage] No text content in Claude response:", JSON.stringify(data));
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No response content from Claude" });
+          }
+          let extracted;
+          try {
+            extracted = JSON.parse(content.replace(/```json|```/g, "").trim());
+          } catch (parseErr) {
+            console.error("[extractFromImage] Failed to parse Claude response as JSON:", content);
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Could not parse medication data from image" });
+          }
           return { name: extracted.name || "", dosage: extracted.dosage || "", frequency: extracted.frequency || "", instructions: extracted.instructions || "" };
         } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          console.error("[extractFromImage] Unexpected error:", err instanceof Error ? err.message : err);
           throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to extract medication from image" });
         }
       }),
