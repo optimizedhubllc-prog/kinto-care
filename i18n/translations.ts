@@ -286,6 +286,25 @@ export const translations = {
       empty: "No emergency info on file yet. Add it so it's ready when it matters.",
       shareByText: "Share by Text",
       lastUpdated: "Last updated",
+      notifyFamily: "Notify Family",
+      notifyMessage: "Medical emergency — calling for help now. Will update as soon as I can.",
+      noFamilyContacts: "Add family members in Contacts with phone numbers first.",
+    },
+
+    // Care Calendar
+    calendar: {
+      title: "Care Calendar",
+      logShift: "Log Shift",
+      noShifts: "No one scheduled this day yet.",
+      unknownCaregiver: "Unknown",
+      caregiver: "Caregiver",
+      selectCaregiver: "Select…",
+      startTime: "Start",
+      endTime: "End",
+      notes: "Notes",
+      notesPlaceholder: "Anything to flag for the next shift…",
+      caregiverRequired: "Please select a caregiver",
+      timesRequired: "Please set a start and end time",
     },
 
     // Document Vault
@@ -592,6 +611,25 @@ export const translations = {
       empty: "Aún no hay información de emergencia registrada. Agrégala para tenerla lista cuando importe.",
       shareByText: "Compartir por Mensaje",
       lastUpdated: "Última actualización",
+      notifyFamily: "Notificar a la Familia",
+      notifyMessage: "Emergencia médica — pidiendo ayuda ahora. Actualizaré en cuanto pueda.",
+      noFamilyContacts: "Agrega familiares en Contactos con números de teléfono primero.",
+    },
+
+    // Calendario de Cuidado
+    calendar: {
+      title: "Calendario de Cuidado",
+      logShift: "Registrar Turno",
+      noShifts: "Nadie programado este día todavía.",
+      unknownCaregiver: "Desconocido",
+      caregiver: "Cuidador",
+      selectCaregiver: "Seleccionar…",
+      startTime: "Inicio",
+      endTime: "Fin",
+      notes: "Notas",
+      notesPlaceholder: "Algo que señalar para el próximo turno…",
+      caregiverRequired: "Por favor selecciona un cuidador",
+      timesRequired: "Por favor establece una hora de inicio y fin",
     },
 
     // Document Vault
