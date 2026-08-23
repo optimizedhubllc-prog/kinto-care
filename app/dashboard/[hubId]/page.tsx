@@ -90,6 +90,7 @@ export default function DashboardPage() {
   const [contacts, setContacts] = useState<ContactItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [contactError, setContactError] = useState<string | null>(null)
 
   // Modal state
   const [apptModal, setApptModal] = useState<null | 'add' | Appointment>(null)
@@ -261,24 +262,35 @@ export default function DashboardPage() {
   }
 
   // Contacts
-  const openAddContact = () => { setContactForm({ country_code: 'US', language_preference: 'en' }); setContactModal('add') }
-  const openEditContact = (c: ContactItem) => { setContactForm(c); setContactModal(c) }
+  const openAddContact = () => { setContactForm({ role: 'family_member', country_code: 'US', language_preference: 'en' }); setContactError(null); setContactModal('add') }
+  const openEditContact = (c: ContactItem) => { setContactForm(c); setContactError(null); setContactModal(c) }
   const saveContact = async () => {
     setSaving(true)
     try {
+      if (!contactForm.name?.trim()) { setContactError(t('contacts.nameRequired')); setSaving(false); return }
+      if (!contactForm.phone?.trim()) { setContactError(t('contacts.phoneRequired')); setSaving(false); return }
       const { data: { user } } = await supabase.auth.getUser()
-      if (contactModal === 'add') {
-        await supabase.from('contacts').insert({ ...contactForm, hub_id: hubId, created_by: user?.id })
-      } else {
-        await supabase.from('contacts').update(contactForm).eq('id', (contactModal as ContactItem).id)
+      const result = contactModal === 'add'
+        ? await supabase.from('contacts').insert({ ...contactForm, hub_id: hubId, created_by: user?.id })
+        : await supabase.from('contacts').update(contactForm).eq('id', (contactModal as ContactItem).id)
+      if (result.error) {
+        console.error('[Contacts] save failed:', result.error)
+        setContactError(result.error.message)
+        setSaving(false)
+        return
       }
       setContactModal(null)
+      setContactError(null)
       await loadData()
-    } catch (e) { console.error(e) }
+    } catch (e) {
+      console.error(e)
+      setContactError(e instanceof Error ? e.message : 'Failed to save contact')
+    }
     setSaving(false)
   }
   const deleteContact = async (id: string) => {
-    await supabase.from('contacts').delete().eq('id', id)
+    const { error: delError } = await supabase.from('contacts').delete().eq('id', id)
+    if (delError) { console.error('[Contacts] delete failed:', delError); setContactError(delError.message); return }
     await loadData()
   }
   const isIntlContact = (c: ContactItem) => c.country_code !== 'US'
@@ -579,6 +591,12 @@ export default function DashboardPage() {
               <Plus className="h-3 w-3" />{t('common.add')}
             </button>
           </div>
+          {contactError && !contactModal && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {contactError}
+            </div>
+          )}
           {contacts.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('contacts.noCaregivers')}</p>
           ) : (
@@ -780,7 +798,13 @@ export default function DashboardPage() {
 
       {/* Contact Modal */}
       {contactModal && (
-        <Modal title={contactModal === 'add' ? t('contacts.addContact') : t('common.edit')} onClose={() => setContactModal(null)}>
+        <Modal title={contactModal === 'add' ? t('contacts.addContact') : t('common.edit')} onClose={() => { setContactModal(null); setContactError(null) }}>
+          {contactError && (
+            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">
+              <AlertTriangle className="h-3 w-3 shrink-0" />
+              {contactError}
+            </div>
+          )}
           <Field label={t('contacts.name')}>
             <input className={inputCls} value={contactForm.name ?? ''} onChange={e => setContactForm(p => ({ ...p, name: e.target.value }))} placeholder={t('contacts.contactNamePlaceholder')} />
           </Field>
