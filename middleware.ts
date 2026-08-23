@@ -45,5 +45,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Exclude /api/* — tRPC's protectedProcedure already enforces auth server-side
+  // for every API call, and running the Supabase session-refresh check on API
+  // routes breaks POST requests with a real body (confirmed: this is the only
+  // POST that's ever hit this middleware, and it consistently 500s here while
+  // every GET page-load request succeeds).
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };
