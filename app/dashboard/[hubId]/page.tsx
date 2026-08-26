@@ -355,7 +355,7 @@ export default function DashboardPage() {
     contacts.filter(c => (CONTACT_ROLE_TO_CATEGORY[c.role] ?? 'other') === cat)
 
   // Notify Family — opens native SMS compose pre-filled with all family contacts + a starter message
-  const notifyFamily = () => {
+  const notifyFamily = async () => {
     const familyContacts = contacts.filter(c => c.role === 'family_member' && c.phone?.trim())
     if (familyContacts.length === 0) {
       setCalendarError(t('emergency.noFamilyContacts'))
@@ -366,6 +366,24 @@ export default function DashboardPage() {
     const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent)
     const separator = isIOS ? ',' : ';'
     const prefix = isIOS ? '&' : '?'
+
+    // Log that the broadcast was triggered, and by whom, independent of
+    // whether the SMS app itself confirms delivery — never let a logging
+    // failure block the actual emergency action.
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('activity_log').insert({
+        hub_id: hubId,
+        actor_id: user?.id ?? null,
+        action_type: 'notified',
+        entity_type: 'emergency_info',
+        description: `Notify Family triggered (${familyContacts.length} contact${familyContacts.length !== 1 ? 's' : ''})`,
+      })
+      loadData()
+    } catch (e) {
+      console.error('[NotifyFamily] Failed to log activity:', e)
+    }
+
     window.location.href = `sms:${numbers.join(separator)}${prefix}body=${encodeURIComponent(message)}`
   }
 
