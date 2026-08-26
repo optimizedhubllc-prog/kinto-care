@@ -21,8 +21,27 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session — do not remove this
-  const { data: { user } } = await supabase.auth.getUser();
+  // Refresh session — do not remove this.
+  // Supabase rotates refresh tokens on every use. If a stale session
+  // (an old cached PWA install, a second tab, etc.) tries to reuse a
+  // token that was already rotated elsewhere, this throws instead of
+  // just returning no user. Treat that specific case as "logged out"
+  // rather than letting it hard-fail the request — clear the stale
+  // auth cookies so the next request starts clean.
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (err) {
+    const isStaleRefreshToken =
+      err instanceof Error &&
+      (err.message.includes("Refresh Token") || err.message.includes("refresh_token"));
+    if (!isStaleRefreshToken) throw err;
+
+    request.cookies.getAll().forEach(({ name }) => {
+      if (name.startsWith("sb-")) supabaseResponse.cookies.delete(name);
+    });
+  }
 
   // Protected routes — redirect to login if not authenticated
   const protectedPaths = ["/dashboard", "/medications", "/appointments", "/care-logistics", "/medical-contacts", "/hub-settings", "/webhook-settings", "/event-history", "/onboarding"];
