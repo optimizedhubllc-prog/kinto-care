@@ -32,6 +32,32 @@ const FAMILY_MEMBERS = [
   { id: "42333315-6fb2-48b5-b4bb-04760e219560", name: "Gloria" },
 ]
 
+// Maps each contact `role` value to one of the three top-level categories
+// requested by the family: family, medical, caregivers. Anything that
+// doesn't fit (role: 'other') falls into its own bucket rather than being
+// silently dropped from view.
+const CONTACT_CATEGORY_ORDER = ['family', 'medical', 'caregivers', 'other'] as const
+type ContactCategory = typeof CONTACT_CATEGORY_ORDER[number]
+const CONTACT_ROLE_TO_CATEGORY: Record<string, ContactCategory> = {
+  family_member: 'family',
+  medical_facility: 'medical',
+  pharmacy: 'medical',
+  caregiver: 'caregivers',
+  other: 'other',
+}
+
+const TABS = [
+  { key: 'overview', icon: AlertTriangle },
+  { key: 'calendar', icon: Calendar },
+  { key: 'appointments', icon: Calendar },
+  { key: 'tasks', icon: CheckSquare },
+  { key: 'medications', icon: Pill },
+  { key: 'documents', icon: FileText },
+  { key: 'contacts', icon: Users },
+  { key: 'team', icon: Users },
+] as const
+type TabKey = typeof TABS[number]['key']
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
@@ -94,6 +120,9 @@ export default function DashboardPage() {
   const [error, setError] = useState('')
   const [contactError, setContactError] = useState<string | null>(null)
   const [calendarError, setCalendarError] = useState<string | null>(null)
+
+  // Tab navigation
+  const [activeTab, setActiveTab] = useState<TabKey>('overview')
 
   // Modal state
   const [apptModal, setApptModal] = useState<null | 'add' | Appointment>(null)
@@ -313,6 +342,17 @@ export default function DashboardPage() {
     }
     return map[role] ?? role
   }
+  const contactCategoryLabel = (cat: ContactCategory) => {
+    const map: Record<ContactCategory, string> = {
+      family: t('contacts.categoryFamily'),
+      medical: t('contacts.categoryMedical'),
+      caregivers: t('contacts.categoryCaregivers'),
+      other: t('contacts.categoryOther'),
+    }
+    return map[cat]
+  }
+  const contactsByCategory = (cat: ContactCategory) =>
+    contacts.filter(c => (CONTACT_ROLE_TO_CATEGORY[c.role] ?? 'other') === cat)
 
   // Notify Family — opens native SMS compose pre-filled with all family contacts + a starter message
   const notifyFamily = () => {
@@ -441,6 +481,20 @@ export default function DashboardPage() {
 
   const getMember = (id: string | null) => FAMILY_MEMBERS.find(m => m.id === id)?.name ?? null
 
+  const tabLabel = (key: TabKey) => {
+    const map: Record<TabKey, string> = {
+      overview: t('nav.overview'),
+      calendar: t('calendar.title'),
+      appointments: t('nav.appointments'),
+      tasks: t('nav.tasks'),
+      medications: t('nav.medications'),
+      documents: t('nav.documents'),
+      contacts: t('nav.contacts'),
+      team: t('nav.team'),
+    }
+    return map[key]
+  }
+
   if (loading || langLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#FDF8F2]">
@@ -473,395 +527,445 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      {/* Top tab navigation */}
+      <nav className="bg-white border-b sticky top-0 z-10 overflow-x-auto">
+        <div className="max-w-5xl mx-auto px-2 flex items-center gap-1">
+          {TABS.map(({ key, icon: Icon }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex items-center gap-1.5 px-3 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                activeTab === key
+                  ? 'border-[#DC2626] text-[#DC2626]'
+                  : 'border-transparent text-muted-foreground hover:text-[#1A2B3C]'
+              }`}
+            >
+              <Icon className="h-4 w-4" />
+              {tabLabel(key)}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
-        {/* Emergency Info */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="h-5 w-5 text-[#DC2626]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('emergency.title')}</h2>
-            <div className="ml-auto flex items-center gap-2">
-              {emergencyInfo && (
-                <button onClick={shareEmergencyInfo} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
-                  <Share2 className="h-3 w-3" />{t('emergency.shareByText')}
-                </button>
+        {/* Overview: Emergency Info + Activity Feed */}
+        {activeTab === 'overview' && (
+          <>
+            <section className="bg-white rounded-xl border shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle className="h-5 w-5 text-[#DC2626]" />
+                <h2 className="font-semibold text-[#1A2B3C]">{t('emergency.title')}</h2>
+                <div className="ml-auto flex items-center gap-2">
+                  {emergencyInfo && (
+                    <button onClick={shareEmergencyInfo} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
+                      <Share2 className="h-3 w-3" />{t('emergency.shareByText')}
+                    </button>
+                  )}
+                  <button onClick={openEmergencyModal} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+                    {emergencyInfo ? t('emergency.edit') : t('emergency.setUp')}
+                  </button>
+                </div>
+              </div>
+              {!emergencyInfo ? (
+                <p className="text-sm text-muted-foreground">{t('emergency.empty')}</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                  {emergencyInfo.allergies && <div><p className="text-xs text-muted-foreground">{t('emergency.allergies')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.allergies}</p></div>}
+                  {emergencyInfo.blood_type && <div><p className="text-xs text-muted-foreground">{t('emergency.bloodType')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.blood_type}</p></div>}
+                  {emergencyInfo.primary_doctor && <div><p className="text-xs text-muted-foreground">{t('emergency.primaryDoctor')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.primary_doctor} {emergencyInfo.primary_doctor_phone}</p></div>}
+                  {emergencyInfo.insurance_provider && <div><p className="text-xs text-muted-foreground">{t('emergency.insuranceProvider')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.insurance_provider} {emergencyInfo.insurance_member_id}</p></div>}
+                  {emergencyInfo.emergency_contact_name && <div><p className="text-xs text-muted-foreground">{t('emergency.emergencyContactName')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.emergency_contact_name} {emergencyInfo.emergency_contact_phone}</p></div>}
+                  {emergencyInfo.notes && <div className="col-span-2 sm:col-span-3"><p className="text-xs text-muted-foreground">{t('emergency.notes')}</p><p className="text-[#1A2B3C]">{emergencyInfo.notes}</p></div>}
+                </div>
               )}
-              <button onClick={openEmergencyModal} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-                {emergencyInfo ? t('emergency.edit') : t('emergency.setUp')}
+              <button onClick={notifyFamily} className="flex items-center justify-center gap-2 w-full mt-4 text-sm bg-[#DC2626] text-white px-4 py-2.5 rounded-lg hover:bg-red-700 font-semibold">
+                <Siren className="h-4 w-4" />{t('emergency.notifyFamily')}
               </button>
-            </div>
-          </div>
-          {!emergencyInfo ? (
-            <p className="text-sm text-muted-foreground">{t('emergency.empty')}</p>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
-              {emergencyInfo.allergies && <div><p className="text-xs text-muted-foreground">{t('emergency.allergies')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.allergies}</p></div>}
-              {emergencyInfo.blood_type && <div><p className="text-xs text-muted-foreground">{t('emergency.bloodType')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.blood_type}</p></div>}
-              {emergencyInfo.primary_doctor && <div><p className="text-xs text-muted-foreground">{t('emergency.primaryDoctor')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.primary_doctor} {emergencyInfo.primary_doctor_phone}</p></div>}
-              {emergencyInfo.insurance_provider && <div><p className="text-xs text-muted-foreground">{t('emergency.insuranceProvider')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.insurance_provider} {emergencyInfo.insurance_member_id}</p></div>}
-              {emergencyInfo.emergency_contact_name && <div><p className="text-xs text-muted-foreground">{t('emergency.emergencyContactName')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.emergency_contact_name} {emergencyInfo.emergency_contact_phone}</p></div>}
-              {emergencyInfo.notes && <div className="col-span-2 sm:col-span-3"><p className="text-xs text-muted-foreground">{t('emergency.notes')}</p><p className="text-[#1A2B3C]">{emergencyInfo.notes}</p></div>}
-            </div>
-          )}
-          <button onClick={notifyFamily} className="flex items-center justify-center gap-2 w-full mt-4 text-sm bg-[#DC2626] text-white px-4 py-2.5 rounded-lg hover:bg-red-700 font-semibold">
-            <Siren className="h-4 w-4" />{t('emergency.notifyFamily')}
-          </button>
-          {calendarError && !shiftModal && (
-            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-2">
-              <AlertTriangle className="h-3 w-3 shrink-0" />
-              {calendarError}
-            </div>
-          )}
-        </section>
+              {calendarError && !shiftModal && (
+                <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-2">
+                  <AlertTriangle className="h-3 w-3 shrink-0" />
+                  {calendarError}
+                </div>
+              )}
+            </section>
 
-        {/* Care Calendar */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('calendar.title')}</h2>
-            <button onClick={() => openAddShift(selectedDay ?? undefined)} className="ml-auto flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />{t('calendar.logShift')}
-            </button>
-          </div>
-          {calendarError && !shiftModal && (
-            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
-              <AlertTriangle className="h-3 w-3 shrink-0" />
-              {calendarError}
-            </div>
-          )}
-
-          <div className="flex items-center justify-between mb-3">
-            <button onClick={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))} className="p-1 hover:bg-[#FDF8F2] rounded"><ChevronLeft className="h-4 w-4 text-[#1A2B3C]" /></button>
-            <p className="text-sm font-semibold text-[#1A2B3C]">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
-            <button onClick={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))} className="p-1 hover:bg-[#FDF8F2] rounded"><ChevronRight className="h-4 w-4 text-[#1A2B3C]" /></button>
-          </div>
-
-          <div className="grid grid-cols-7 gap-1 text-center">
-            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
-              <div key={i} className="text-xs text-muted-foreground font-semibold pb-1">{d}</div>
-            ))}
-            {calendarDays.map((day, i) => {
-              if (!day) return <div key={i} />
-              const dayShifts = shiftsOnDay(day)
-              const isSelected = selectedDay && day.getTime() === selectedDay.getTime()
-              return (
-                <button
-                  key={i}
-                  onClick={() => setSelectedDay(isSelected ? null : day)}
-                  className={`min-h-[3.5rem] rounded-lg border p-1 text-left transition-colors ${isToday(day) ? 'border-[#DC2626]' : 'border-transparent'} ${isSelected ? 'bg-[#FDF8F2]' : 'hover:bg-[#FDF8F2]'}`}
-                >
-                  <p className={`text-xs ${isToday(day) ? 'text-[#DC2626] font-bold' : 'text-[#1A2B3C]'}`}>{day.getDate()}</p>
-                  <div className="space-y-0.5 mt-0.5">
-                    {dayShifts.slice(0, 2).map(s => (
-                      <p key={s.id} className="text-[10px] leading-tight bg-teal-100 text-teal-800 rounded px-1 truncate">{getMember(s.caregiver_id) ?? '?'}</p>
-                    ))}
-                    {dayShifts.length > 2 && <p className="text-[10px] text-muted-foreground">+{dayShifts.length - 2}</p>}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          {selectedDay && (
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-sm font-semibold text-[#1A2B3C] mb-2">{selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
-              {shiftsOnDay(selectedDay).length === 0 ? (
-                <p className="text-sm text-muted-foreground">{t('calendar.noShifts')}</p>
+            <section className="bg-white rounded-xl border shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Clock className="h-5 w-5 text-[#0D9488]" />
+                <h2 className="font-semibold text-[#1A2B3C]">{t('activity.title')}</h2>
+              </div>
+              {activity.length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('activity.empty')}</p>
               ) : (
                 <div className="space-y-2">
-                  {shiftsOnDay(selectedDay).map(s => (
-                    <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
-                      <div>
-                        <p className="text-sm font-medium text-[#1A2B3C]">{getMember(s.caregiver_id) ?? t('calendar.unknownCaregiver')}</p>
-                        <p className="text-xs text-muted-foreground">{formatShiftTime(s.start_time)} – {formatShiftTime(s.end_time)}{s.task_notes ? ` · ${s.task_notes}` : ''}</p>
-                      </div>
-                      <div className="flex items-center gap-2 ml-4 shrink-0">
-                        <button onClick={() => openEditShift(s)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
-                        <button onClick={() => deleteShift(s.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
-                      </div>
+                  {activity.map(a => (
+                    <div key={a.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                      <p className="text-sm text-[#1A2B3C]">{a.description}</p>
+                      <span className="text-xs text-muted-foreground shrink-0 ml-3">{timeAgo(a.created_at)}</span>
                     </div>
                   ))}
                 </div>
               )}
+            </section>
+          </>
+        )}
+
+        {/* Care Calendar */}
+        {activeTab === 'calendar' && (
+          <section className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="h-5 w-5 text-[#0D9488]" />
+              <h2 className="font-semibold text-[#1A2B3C]">{t('calendar.title')}</h2>
+              <button onClick={() => openAddShift(selectedDay ?? undefined)} className="ml-auto flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+                <Plus className="h-3 w-3" />{t('calendar.logShift')}
+              </button>
             </div>
-          )}
-        </section>
+            {calendarError && !shiftModal && (
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                {calendarError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mb-3">
+              <button onClick={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() - 1, 1))} className="p-1 hover:bg-[#FDF8F2] rounded"><ChevronLeft className="h-4 w-4 text-[#1A2B3C]" /></button>
+              <p className="text-sm font-semibold text-[#1A2B3C]">{calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+              <button onClick={() => setCalendarMonth(m => new Date(m.getFullYear(), m.getMonth() + 1, 1))} className="p-1 hover:bg-[#FDF8F2] rounded"><ChevronRight className="h-4 w-4 text-[#1A2B3C]" /></button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center">
+              {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                <div key={i} className="text-xs text-muted-foreground font-semibold pb-1">{d}</div>
+              ))}
+              {calendarDays.map((day, i) => {
+                if (!day) return <div key={i} />
+                const dayShifts = shiftsOnDay(day)
+                const isSelected = selectedDay && day.getTime() === selectedDay.getTime()
+                return (
+                  <button
+                    key={i}
+                    onClick={() => setSelectedDay(isSelected ? null : day)}
+                    className={`min-h-[3.5rem] rounded-lg border p-1 text-left transition-colors ${isToday(day) ? 'border-[#DC2626]' : 'border-transparent'} ${isSelected ? 'bg-[#FDF8F2]' : 'hover:bg-[#FDF8F2]'}`}
+                  >
+                    <p className={`text-xs ${isToday(day) ? 'text-[#DC2626] font-bold' : 'text-[#1A2B3C]'}`}>{day.getDate()}</p>
+                    <div className="space-y-0.5 mt-0.5">
+                      {dayShifts.slice(0, 2).map(s => (
+                        <p key={s.id} className="text-[10px] leading-tight bg-teal-100 text-teal-800 rounded px-1 truncate">{getMember(s.caregiver_id) ?? '?'}</p>
+                      ))}
+                      {dayShifts.length > 2 && <p className="text-[10px] text-muted-foreground">+{dayShifts.length - 2}</p>}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {selectedDay && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm font-semibold text-[#1A2B3C] mb-2">{selectedDay.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</p>
+                {shiftsOnDay(selectedDay).length === 0 ? (
+                  <p className="text-sm text-muted-foreground">{t('calendar.noShifts')}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {shiftsOnDay(selectedDay).map(s => (
+                      <div key={s.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
+                        <div>
+                          <p className="text-sm font-medium text-[#1A2B3C]">{getMember(s.caregiver_id) ?? t('calendar.unknownCaregiver')}</p>
+                          <p className="text-xs text-muted-foreground">{formatShiftTime(s.start_time)} – {formatShiftTime(s.end_time)}{s.task_notes ? ` · ${s.task_notes}` : ''}</p>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4 shrink-0">
+                          <button onClick={() => openEditShift(s)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                          <button onClick={() => deleteShift(s.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Appointments */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Calendar className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('nav.appointments')}</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{appointments.length} {t('dashboard.upcomingAppointments').toLowerCase()}</span>
-            <button onClick={openAddAppt} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />{t('common.add')}
-            </button>
-          </div>
-          {appointments.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No appointments scheduled.</p>
-          ) : (
-            <div className="space-y-3">
-              {appointments.map(a => (
-                <div key={a.id} className="flex flex-col gap-1 py-2 border-b last:border-0">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-[#1A2B3C]">{a.doctor_name ?? 'Unknown provider'}</p>
-                      {a.specialty && <p className="text-xs text-muted-foreground">{a.specialty}</p>}
-                      {a.location && <p className="text-xs text-muted-foreground">📍 {a.location}</p>}
-                      {a.notes && <p className="text-xs text-muted-foreground mt-1">{a.notes}</p>}
-                    </div>
-                    <div className="flex items-center gap-2 ml-4 shrink-0">
-                      <p className="text-xs text-muted-foreground">{new Date(a.date_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
-                      <button onClick={() => openEditAppt(a)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
-                      <button onClick={() => deleteAppt(a.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+        {activeTab === 'appointments' && (
+          <section className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="h-5 w-5 text-[#0D9488]" />
+              <h2 className="font-semibold text-[#1A2B3C]">{t('nav.appointments')}</h2>
+              <span className="ml-auto text-xs text-muted-foreground mr-3">{appointments.length} {t('dashboard.upcomingAppointments').toLowerCase()}</span>
+              <button onClick={openAddAppt} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+                <Plus className="h-3 w-3" />{t('common.add')}
+              </button>
+            </div>
+            {appointments.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No appointments scheduled.</p>
+            ) : (
+              <div className="space-y-3">
+                {appointments.map(a => (
+                  <div key={a.id} className="flex flex-col gap-1 py-2 border-b last:border-0">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-[#1A2B3C]">{a.doctor_name ?? 'Unknown provider'}</p>
+                        {a.specialty && <p className="text-xs text-muted-foreground">{a.specialty}</p>}
+                        {a.location && <p className="text-xs text-muted-foreground">📍 {a.location}</p>}
+                        {a.notes && <p className="text-xs text-muted-foreground mt-1">{a.notes}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 ml-4 shrink-0">
+                        <p className="text-xs text-muted-foreground">{new Date(a.date_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+                        <button onClick={() => openEditAppt(a)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                        <button onClick={() => deleteAppt(a.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Activity Feed */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('activity.title')}</h2>
-          </div>
-          {activity.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('activity.empty')}</p>
-          ) : (
-            <div className="space-y-2">
-              {activity.map(a => (
-                <div key={a.id} className="flex items-center justify-between py-1.5 border-b last:border-0">
-                  <p className="text-sm text-[#1A2B3C]">{a.description}</p>
-                  <span className="text-xs text-muted-foreground shrink-0 ml-3">{timeAgo(a.created_at)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Tasks */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckSquare className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('tasks.title')}</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{tasks.filter(tk => tk.status !== 'completed').length} {t('tasks.pending').toLowerCase()}</span>
-            <button onClick={openAddTask} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />{t('common.add')}
-            </button>
-          </div>
-          {tasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('tasks.noTasks')}</p>
-          ) : (
-            <div className="space-y-2">
-              {tasks.map(tk => (
-                <div key={tk.id} className="py-2 border-b last:border-0">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm font-medium ${tk.status === 'completed' ? 'line-through text-muted-foreground' : 'text-[#1A2B3C]'}`}>{tk.title}</p>
-                      {tk.description && <p className="text-xs text-muted-foreground">{tk.description}</p>}
-                      <div className="flex gap-3 mt-0.5">
-                        {tk.due_date && <p className="text-xs text-muted-foreground">{t('tasks.due')} {new Date(tk.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>}
-                        {tk.assigned_to && <p className="text-xs text-muted-foreground">👤 {getMember(tk.assigned_to)}</p>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 ml-4 shrink-0">
-                      <span className={`text-xs font-medium ${priorityColor(tk.priority)}`}>{tk.priority}</span>
-                      <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{statusLabel(tk.status)}</span>
-                      <button onClick={() => toggleTaskComments(tk.id)} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
-                        <MessageCircle className="h-3 w-3" />
-                        {taskComments[tk.id]?.length ? taskComments[tk.id].length : ''}
-                        {expandedTask === tk.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-                      </button>
-                      <button onClick={() => openEditTask(tk)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
-                      <button onClick={() => deleteTask(tk.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
-                    </div>
-                  </div>
-
-                  {expandedTask === tk.id && (
-                    <div className="mt-2 ml-1 pl-3 border-l-2 border-[#FDF8F2] space-y-2">
-                      {commentsLoading && !taskComments[tk.id] ? (
-                        <p className="text-xs text-muted-foreground">{t('common.loading')}</p>
-                      ) : (taskComments[tk.id]?.length ?? 0) === 0 ? (
-                        <p className="text-xs text-muted-foreground">{t('taskComments.noComments')}</p>
-                      ) : (
-                        taskComments[tk.id].map(c => (
-                          <div key={c.id} className="text-xs">
-                            <span className="font-medium text-[#1A2B3C]">{getMember(c.author_id) ?? 'Someone'}</span>
-                            <span className="text-muted-foreground ml-1">{timeAgo(c.created_at)}</span>
-                            <p className="text-[#1A2B3C]">{c.comment}</p>
-                          </div>
-                        ))
-                      )}
-                      <div className="flex gap-2 pt-1">
-                        <input
-                          className="flex-1 border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
-                          placeholder={t('taskComments.addComment')}
-                          value={commentDraft}
-                          onChange={e => setCommentDraft(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Enter') postComment(tk.id) }}
-                        />
-                        <button onClick={() => postComment(tk.id)} className="text-xs bg-[#0D9488] text-white px-2 py-1 rounded-lg hover:bg-teal-700 flex items-center gap-1">
-                          <Send className="h-3 w-3" />{t('taskComments.post')}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
+        {activeTab === 'tasks' && (
+          <section className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <CheckSquare className="h-5 w-5 text-[#0D9488]" />
+              <h2 className="font-semibold text-[#1A2B3C]">{t('tasks.title')}</h2>
+              <span className="ml-auto text-xs text-muted-foreground mr-3">{tasks.filter(tk => tk.status !== 'completed').length} {t('tasks.pending').toLowerCase()}</span>
+              <button onClick={openAddTask} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+                <Plus className="h-3 w-3" />{t('common.add')}
+              </button>
             </div>
-          )}
-        </section>
+            {tasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('tasks.noTasks')}</p>
+            ) : (
+              <div className="space-y-2">
+                {tasks.map(tk => (
+                  <div key={tk.id} className="py-2 border-b last:border-0">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`text-sm font-medium ${tk.status === 'completed' ? 'line-through text-muted-foreground' : 'text-[#1A2B3C]'}`}>{tk.title}</p>
+                        {tk.description && <p className="text-xs text-muted-foreground">{tk.description}</p>}
+                        <div className="flex gap-3 mt-0.5">
+                          {tk.due_date && <p className="text-xs text-muted-foreground">{t('tasks.due')} {new Date(tk.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>}
+                          {tk.assigned_to && <p className="text-xs text-muted-foreground">👤 {getMember(tk.assigned_to)}</p>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4 shrink-0">
+                        <span className={`text-xs font-medium ${priorityColor(tk.priority)}`}>{tk.priority}</span>
+                        <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{statusLabel(tk.status)}</span>
+                        <button onClick={() => toggleTaskComments(tk.id)} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
+                          <MessageCircle className="h-3 w-3" />
+                          {taskComments[tk.id]?.length ? taskComments[tk.id].length : ''}
+                          {expandedTask === tk.id ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                        </button>
+                        <button onClick={() => openEditTask(tk)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                        <button onClick={() => deleteTask(tk.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                      </div>
+                    </div>
+
+                    {expandedTask === tk.id && (
+                      <div className="mt-2 ml-1 pl-3 border-l-2 border-[#FDF8F2] space-y-2">
+                        {commentsLoading && !taskComments[tk.id] ? (
+                          <p className="text-xs text-muted-foreground">{t('common.loading')}</p>
+                        ) : (taskComments[tk.id]?.length ?? 0) === 0 ? (
+                          <p className="text-xs text-muted-foreground">{t('taskComments.noComments')}</p>
+                        ) : (
+                          taskComments[tk.id].map(c => (
+                            <div key={c.id} className="text-xs">
+                              <span className="font-medium text-[#1A2B3C]">{getMember(c.author_id) ?? 'Someone'}</span>
+                              <span className="text-muted-foreground ml-1">{timeAgo(c.created_at)}</span>
+                              <p className="text-[#1A2B3C]">{c.comment}</p>
+                            </div>
+                          ))
+                        )}
+                        <div className="flex gap-2 pt-1">
+                          <input
+                            className="flex-1 border rounded-lg px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#0D9488]"
+                            placeholder={t('taskComments.addComment')}
+                            value={commentDraft}
+                            onChange={e => setCommentDraft(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') postComment(tk.id) }}
+                          />
+                          <button onClick={() => postComment(tk.id)} className="text-xs bg-[#0D9488] text-white px-2 py-1 rounded-lg hover:bg-teal-700 flex items-center gap-1">
+                            <Send className="h-3 w-3" />{t('taskComments.post')}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Medications */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Pill className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('nav.medications')}</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{medications.length} {t('medications.title').toLowerCase()}</span>
-            <button
-              onClick={() => setScanModal(true)}
-              className="flex items-center gap-1 text-xs bg-[#0D9488] text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-semibold mr-2"
-            >
-              {t('medications.scanLabel')}
-            </button>
-            <button onClick={openAddMed} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />{t('common.add')}
-            </button>
-          </div>
-          {medications.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('medications.noMeds')}</p>
-          ) : (
-            <div className="space-y-2">
-              {medications.map(m => (
-                <div key={m.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-[#1A2B3C]">{m.name}</p>
-                    <p className="text-xs text-muted-foreground">{[m.dosage, m.frequency].filter(Boolean).join(' · ')}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => openEditMed(m)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
-                    <button onClick={() => deleteMed(m.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
-                  </div>
-                </div>
-              ))}
+        {activeTab === 'medications' && (
+          <section className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Pill className="h-5 w-5 text-[#0D9488]" />
+              <h2 className="font-semibold text-[#1A2B3C]">{t('nav.medications')}</h2>
+              <span className="ml-auto text-xs text-muted-foreground mr-3">{medications.length} {t('medications.title').toLowerCase()}</span>
+              <button
+                onClick={() => setScanModal(true)}
+                className="flex items-center gap-1 text-xs bg-[#0D9488] text-white px-3 py-1.5 rounded-lg hover:bg-teal-700 font-semibold mr-2"
+              >
+                {t('medications.scanLabel')}
+              </button>
+              <button onClick={openAddMed} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+                <Plus className="h-3 w-3" />{t('common.add')}
+              </button>
             </div>
-          )}
-        </section>
+            {medications.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('medications.noMeds')}</p>
+            ) : (
+              <div className="space-y-2">
+                {medications.map(m => (
+                  <div key={m.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-[#1A2B3C]">{m.name}</p>
+                      <p className="text-xs text-muted-foreground">{[m.dosage, m.frequency].filter(Boolean).join(' · ')}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => openEditMed(m)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                      <button onClick={() => deleteMed(m.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Documents */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('documents.title')}</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{documents.length}</span>
-            <button onClick={openAddDoc} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />{t('common.add')}
-            </button>
-          </div>
-          {documents.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('documents.empty')}</p>
-          ) : (
-            <div className="space-y-2">
-              {documents.map(d => (
-                <div key={d.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-[#1A2B3C]">{d.name}</p>
-                    <div className="flex gap-2 items-center mt-0.5">
-                      <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{docCategoryLabel(d.category)}</span>
-                      {d.notes && <p className="text-xs text-muted-foreground">{d.notes}</p>}
+        {activeTab === 'documents' && (
+          <section className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <FileText className="h-5 w-5 text-[#0D9488]" />
+              <h2 className="font-semibold text-[#1A2B3C]">{t('documents.title')}</h2>
+              <span className="ml-auto text-xs text-muted-foreground mr-3">{documents.length}</span>
+              <button onClick={openAddDoc} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+                <Plus className="h-3 w-3" />{t('common.add')}
+              </button>
+            </div>
+            {documents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('documents.empty')}</p>
+            ) : (
+              <div className="space-y-2">
+                {documents.map(d => (
+                  <div key={d.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-[#1A2B3C]">{d.name}</p>
+                      <div className="flex gap-2 items-center mt-0.5">
+                        <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{docCategoryLabel(d.category)}</span>
+                        {d.notes && <p className="text-xs text-muted-foreground">{d.notes}</p>}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 ml-4 shrink-0">
+                      {d.file_url && (
+                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
+                          <ExternalLink className="h-3 w-3" />{t('documents.openLink')}
+                        </a>
+                      )}
+                      <button onClick={() => deleteDoc(d.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 ml-4 shrink-0">
-                    {d.file_url && (
-                      <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
-                        <ExternalLink className="h-3 w-3" />{t('documents.openLink')}
-                      </a>
-                    )}
-                    <button onClick={() => deleteDoc(d.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
-        {/* Contacts */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">{t('contacts.title')}</h2>
-            <span className="ml-auto text-xs text-muted-foreground mr-3">{contacts.length}</span>
-            <button onClick={openAddContact} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
-              <Plus className="h-3 w-3" />{t('common.add')}
-            </button>
-          </div>
-          {contactError && !contactModal && (
-            <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
-              <AlertTriangle className="h-3 w-3 shrink-0" />
-              {contactError}
+        {/* Contacts — grouped by category: family, medical, caregivers, other */}
+        {activeTab === 'contacts' && (
+          <section className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-[#0D9488]" />
+              <h2 className="font-semibold text-[#1A2B3C]">{t('contacts.title')}</h2>
+              <span className="ml-auto text-xs text-muted-foreground mr-3">{contacts.length}</span>
+              <button onClick={openAddContact} className="flex items-center gap-1 text-xs bg-[#DC2626] text-white px-3 py-1.5 rounded-lg hover:bg-red-700 font-semibold">
+                <Plus className="h-3 w-3" />{t('common.add')}
+              </button>
             </div>
-          )}
-          {contacts.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('contacts.noCaregivers')}</p>
-          ) : (
-            <div className="space-y-2">
-              {contacts.map(c => (
-                <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-[#1A2B3C]">{c.name}</p>
-                      <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{contactRoleLabel(c.role)}</span>
-                      {isIntlContact(c) && <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5">{t('contacts.international')}</span>}
+            {contactError && !contactModal && (
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                {contactError}
+              </div>
+            )}
+            {contacts.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{t('contacts.noCaregivers')}</p>
+            ) : (
+              <div className="space-y-6">
+                {CONTACT_CATEGORY_ORDER.map(cat => {
+                  const group = contactsByCategory(cat)
+                  if (group.length === 0) return null
+                  return (
+                    <div key={cat}>
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                        {contactCategoryLabel(cat)} <span className="normal-case">· {group.length}</span>
+                      </h3>
+                      <div className="space-y-2">
+                        {group.map(c => (
+                          <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-[#1A2B3C]">{c.name}</p>
+                                <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{contactRoleLabel(c.role)}</span>
+                                {isIntlContact(c) && <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5">{t('contacts.international')}</span>}
+                              </div>
+                              {c.phone && <p className="text-xs text-muted-foreground font-mono mt-0.5">{c.phone}</p>}
+                              {c.notes && <p className="text-xs text-muted-foreground mt-0.5">{c.notes}</p>}
+                            </div>
+                            <div className="flex items-center gap-3 ml-4 shrink-0">
+                              {c.phone && isIntlContact(c) && (
+                                <a href={contactWhatsAppUrl(c)} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-2 py-1 rounded-lg hover:bg-green-600">
+                                  {t('contacts.whatsapp')}
+                                </a>
+                              )}
+                              {c.phone && (
+                                <a href={`tel:${c.phone}`} className="text-xs bg-[#0D9488] text-white px-2 py-1 rounded-lg hover:bg-teal-700">
+                                  {t('contacts.call')}
+                                </a>
+                              )}
+                              <button onClick={() => openEditContact(c)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
+                              <button onClick={() => deleteContact(c.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    {c.phone && <p className="text-xs text-muted-foreground font-mono mt-0.5">{c.phone}</p>}
-                    {c.notes && <p className="text-xs text-muted-foreground mt-0.5">{c.notes}</p>}
-                  </div>
-                  <div className="flex items-center gap-3 ml-4 shrink-0">
-                    {c.phone && isIntlContact(c) && (
-                      <a href={contactWhatsAppUrl(c)} target="_blank" rel="noopener noreferrer" className="text-xs bg-green-500 text-white px-2 py-1 rounded-lg hover:bg-green-600">
-                        {t('contacts.whatsapp')}
-                      </a>
-                    )}
-                    {c.phone && (
-                      <a href={`tel:${c.phone}`} className="text-xs bg-[#0D9488] text-white px-2 py-1 rounded-lg hover:bg-teal-700">
-                        {t('contacts.call')}
-                      </a>
-                    )}
-                    <button onClick={() => openEditContact(c)} className="text-xs text-[#0D9488] hover:underline">{t('common.edit')}</button>
-                    <button onClick={() => deleteContact(c.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        )}
 
         {/* Care Team */}
-        <section className="bg-white rounded-xl border shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Users className="h-5 w-5 text-[#0D9488]" />
-            <h2 className="font-semibold text-[#1A2B3C]">Care Team</h2>
-            <span className="ml-auto text-xs text-muted-foreground">{members.length} member{members.length !== 1 ? 's' : ''}</span>
-          </div>
-          {members.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No team members yet.</p>
-          ) : (
-            <div className="space-y-2">
-              {members.map(m => (
-                <div key={m.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="text-sm font-medium text-[#1A2B3C]">{m.users?.name ?? m.users?.email ?? 'Unknown'}</p>
-                    <p className="text-xs text-muted-foreground">{m.users?.email}</p>
-                  </div>
-                  <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{roleLabel(m.role)}</span>
-                </div>
-              ))}
+        {activeTab === 'team' && (
+          <section className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Users className="h-5 w-5 text-[#0D9488]" />
+              <h2 className="font-semibold text-[#1A2B3C]">Care Team</h2>
+              <span className="ml-auto text-xs text-muted-foreground">{members.length} member{members.length !== 1 ? 's' : ''}</span>
             </div>
-          )}
-        </section>
+            {members.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No team members yet.</p>
+            ) : (
+              <div className="space-y-2">
+                {members.map(m => (
+                  <div key={m.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-[#1A2B3C]">{m.users?.name ?? m.users?.email ?? 'Unknown'}</p>
+                      <p className="text-xs text-muted-foreground">{m.users?.email}</p>
+                    </div>
+                    <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{roleLabel(m.role)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
 
         <p className="text-xs text-center text-muted-foreground pb-4">
           {t('common.disclaimer')}
