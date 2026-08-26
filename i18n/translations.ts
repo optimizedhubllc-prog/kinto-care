@@ -12,12 +12,15 @@ export const translations = {
     // Navigation
     nav: {
       dashboard: "Dashboard",
+      overview: "Overview",
       tasks: "Tasks",
       medications: "Medications",
       appointments: "Appointments",
       careSchedule: "Care Schedule",
       medicalContacts: "Medical Contacts",
       contacts: "Contacts",
+      documents: "Documents",
+      team: "Care Team",
       logout: "Logout",
     },
 
@@ -200,6 +203,10 @@ export const translations = {
       medicalFacility: "Medical Facility",
       pharmacy: "Pharmacy",
       other: "Other",
+      categoryFamily: "Family",
+      categoryMedical: "Medical",
+      categoryCaregivers: "Caregivers",
+      categoryOther: "Other",
       contactAdded: "Contact added",
       routingPreview: "Routing:",
       standardCalling: "This contact will use standard calling (tel: link)",
@@ -337,12 +344,15 @@ export const translations = {
     // Navigation
     nav: {
       dashboard: "Panel",
+      overview: "Resumen",
       tasks: "Tareas",
       medications: "Medicamentos",
       appointments: "Citas",
       careSchedule: "Horario de Cuidado",
       medicalContacts: "Contactos Médicos",
       contacts: "Contactos",
+      documents: "Documentos",
+      team: "Equipo de Cuidado",
       logout: "Cerrar Sesión",
     },
 
@@ -525,6 +535,10 @@ export const translations = {
       medicalFacility: "Instalación Médica",
       pharmacy: "Farmacia",
       other: "Otro",
+      categoryFamily: "Familia",
+      categoryMedical: "Médico",
+      categoryCaregivers: "Cuidadores",
+      categoryOther: "Otro",
       contactAdded: "Contacto agregado",
       routingPreview: "Enrutamiento:",
       standardCalling: "Este contacto utilizará llamadas estándar (enlace tel:)",
