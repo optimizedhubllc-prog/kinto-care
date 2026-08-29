@@ -24,23 +24,26 @@ export async function middleware(request: NextRequest) {
   // Refresh session — do not remove this.
   // Supabase rotates refresh tokens on every use. If a stale session
   // (an old cached PWA install, a second tab, etc.) tries to reuse a
-  // token that was already rotated elsewhere, this throws instead of
-  // just returning no user. Treat that specific case as "logged out"
-  // rather than letting it hard-fail the request — clear the stale
-  // auth cookies so the next request starts clean.
-  let user = null;
-  try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
-  } catch (err) {
-    const isStaleRefreshToken =
-      err instanceof Error &&
-      (err.message.includes("Refresh Token") || err.message.includes("refresh_token"));
-    if (!isStaleRefreshToken) throw err;
+  // token that was already rotated elsewhere, getUser() returns this
+  // as an ERROR VALUE on the response — it does not throw. Check the
+  // returned error directly rather than try/catch, and treat a stale
+  // refresh token as "logged out" instead of leaking the raw error.
+  const { data, error } = await supabase.auth.getUser();
+  let user = data?.user ?? null;
 
-    request.cookies.getAll().forEach(({ name }) => {
-      if (name.startsWith("sb-")) supabaseResponse.cookies.delete(name);
-    });
+  if (error) {
+    const isStaleRefreshToken =
+      error.message?.includes("Refresh Token") ||
+      error.code === "refresh_token_already_used";
+
+    if (isStaleRefreshToken) {
+      request.cookies.getAll().forEach(({ name }) => {
+        if (name.startsWith("sb-")) supabaseResponse.cookies.delete(name);
+      });
+    } else {
+      console.error("[middleware] Unexpected auth error:", error);
+    }
+    user = null;
   }
 
   // Protected routes — redirect to login if not authenticated
