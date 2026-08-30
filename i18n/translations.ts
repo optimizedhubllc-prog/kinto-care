@@ -342,6 +342,16 @@ export const translations = {
       categoryId: "ID / Identification",
       categoryOther: "Other",
       openLink: "Open",
+      attachFile: "Attach a File",
+      takePhoto: "Take Photo",
+      chooseFile: "Choose File",
+      linkAlt: "Or paste a link instead (optional)",
+      uploaded: "Uploaded",
+      uploadError: "Please upload a JPG, PNG, WebP, or PDF file",
+      fileSizeError: "File size must be less than 20MB",
+      share: "Share",
+      shareError: "Couldn't create a share link. Please try again.",
+      openError: "Couldn't open this document. Please try again.",
     },
 
     // Task Comments
@@ -687,6 +697,16 @@ export const translations = {
       categoryId: "Identificación",
       categoryOther: "Otro",
       openLink: "Abrir",
+      attachFile: "Adjuntar un Archivo",
+      takePhoto: "Tomar Foto",
+      chooseFile: "Elegir Archivo",
+      linkAlt: "O pega un enlace en su lugar (opcional)",
+      uploaded: "Adjuntado",
+      uploadError: "Por favor sube un archivo JPG, PNG, WebP o PDF",
+      fileSizeError: "El tamaño del archivo debe ser menor a 20MB",
+      share: "Compartir",
+      shareError: "No se pudo crear el enlace para compartir. Inténtalo de nuevo.",
+      openError: "No se pudo abrir este documento. Inténtalo de nuevo.",
     },
 
     // Task Comments
