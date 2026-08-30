@@ -20,7 +20,12 @@ type EmergencyInfo = {
 }
 type DocumentItem = { id: string; name: string; category: string; file_url: string | null; notes: string | null; created_at: string }
 type TaskComment = { id: string; task_id: string; author_id: string | null; comment: string; created_at: string }
-type ContactItem = { id: string; name: string; role: string; phone: string; country_code: string; language_preference: string; notes: string | null }
+type ContactItem = {
+  id: string; name: string; role: string; phone: string; country_code: string; language_preference: string; notes: string | null
+  // Logistics-only flags — who to notify/who has legal authority. Never a clinical field.
+  // Multiple contacts can carry is_emergency_contact = true; that's how >1 emergency contact works.
+  is_emergency_contact: boolean; is_power_of_attorney: boolean; is_healthcare_proxy: boolean
+}
 type Shift = { id: string; caregiver_id: string | null; start_time: string; end_time: string; task_notes: string | null }
 
 const FAMILY_MEMBERS = [
@@ -169,7 +174,7 @@ export default function DashboardPage() {
       supabase.from('activity_log').select('id, action_type, entity_type, description, created_at, actor_id').eq('hub_id', hubId).order('created_at', { ascending: false }).limit(10),
       supabase.from('emergency_info').select('*').eq('hub_id', hubId).maybeSingle(),
       supabase.from('documents').select('id, name, category, file_url, notes, created_at').eq('hub_id', hubId).order('created_at', { ascending: false }),
-      supabase.from('contacts').select('id, name, role, phone, country_code, language_preference, notes').eq('hub_id', hubId).order('name', { ascending: true }),
+      supabase.from('contacts').select('id, name, role, phone, country_code, language_preference, notes, is_emergency_contact, is_power_of_attorney, is_healthcare_proxy').eq('hub_id', hubId).order('name', { ascending: true }),
       supabase.from('care_logistics').select('id, caregiver_id, start_time, end_time, task_notes').eq('hub_id', hubId).order('start_time', { ascending: true }),
     ])
 
@@ -270,13 +275,22 @@ export default function DashboardPage() {
   }
   const shareEmergencyInfo = () => {
     if (!emergencyInfo) return
+    const emergencyContacts = contacts.filter(c => c.is_emergency_contact)
+    const poaContacts = contacts.filter(c => c.is_power_of_attorney)
+    const proxyContacts = contacts.filter(c => c.is_healthcare_proxy)
+    const hasAdvanceDirective = documents.some(d => d.category === 'advance_directive')
     const lines = [
       `${patientName} — ${t('emergency.title')}`,
       emergencyInfo.allergies && `${t('emergency.allergies')}: ${emergencyInfo.allergies}`,
       emergencyInfo.blood_type && `${t('emergency.bloodType')}: ${emergencyInfo.blood_type}`,
       emergencyInfo.primary_doctor && `${t('emergency.primaryDoctor')}: ${emergencyInfo.primary_doctor} ${emergencyInfo.primary_doctor_phone ?? ''}`,
       emergencyInfo.insurance_provider && `${t('emergency.insuranceProvider')}: ${emergencyInfo.insurance_provider} ${emergencyInfo.insurance_member_id ?? ''}`,
-      emergencyInfo.emergency_contact_name && `${t('emergency.emergencyContactName')}: ${emergencyInfo.emergency_contact_name} ${emergencyInfo.emergency_contact_phone ?? ''}`,
+      emergencyContacts.length > 0
+        ? `${t('emergency.emergencyContacts')}: ${emergencyContacts.map(c => `${c.name} ${c.phone}`).join(', ')}`
+        : (emergencyInfo.emergency_contact_name && `${t('emergency.emergencyContactName')}: ${emergencyInfo.emergency_contact_name} ${emergencyInfo.emergency_contact_phone ?? ''}`),
+      poaContacts.length > 0 && `${t('emergency.powerOfAttorney')}: ${poaContacts.map(c => c.name).join(', ')}`,
+      proxyContacts.length > 0 && `${t('emergency.healthcareProxy')}: ${proxyContacts.map(c => c.name).join(', ')}`,
+      hasAdvanceDirective && `${t('emergency.advanceDirectiveOnFile')}`,
     ].filter(Boolean).join('\n')
     if (navigator.share) {
       navigator.share({ title: t('emergency.title'), text: lines }).catch(() => {})
@@ -302,7 +316,7 @@ export default function DashboardPage() {
   }
 
   // Contacts
-  const openAddContact = () => { setContactForm({ role: 'family_member', country_code: 'US', language_preference: 'en' }); setContactError(null); setContactModal('add') }
+  const openAddContact = () => { setContactForm({ role: 'family_member', country_code: 'US', language_preference: 'en', is_emergency_contact: false, is_power_of_attorney: false, is_healthcare_proxy: false }); setContactError(null); setContactModal('add') }
   const openEditContact = (c: ContactItem) => { setContactForm(c); setContactError(null); setContactModal(c) }
   const saveContact = async () => {
     setSaving(true)
@@ -353,6 +367,17 @@ export default function DashboardPage() {
   }
   const contactsByCategory = (cat: ContactCategory) =>
     contacts.filter(c => (CONTACT_ROLE_TO_CATEGORY[c.role] ?? 'other') === cat)
+
+  // Overview: derived from the Contacts tab flags rather than a single hardcoded
+  // field, so a hub can have any number of emergency contacts, POAs, or proxies.
+  // Nothing clinical lives here — these are "who to call / who's authorized"
+  // pointers only. An advance directive's existence is surfaced by checking
+  // whether a document is on file, never by storing a code-status value.
+  const emergencyContactList = contacts.filter(c => c.is_emergency_contact)
+  const poaContactList = contacts.filter(c => c.is_power_of_attorney)
+  const healthcareProxyContactList = contacts.filter(c => c.is_healthcare_proxy)
+  const hasAdvanceDirectiveOnFile = documents.some(d => d.category === 'advance_directive')
+  const hasPoaDocumentOnFile = documents.some(d => d.category === 'poa')
 
   // Notify Family — opens native SMS compose pre-filled with all family contacts + a starter message
   const notifyFamily = async () => {
@@ -593,10 +618,43 @@ export default function DashboardPage() {
                   {emergencyInfo.blood_type && <div><p className="text-xs text-muted-foreground">{t('emergency.bloodType')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.blood_type}</p></div>}
                   {emergencyInfo.primary_doctor && <div><p className="text-xs text-muted-foreground">{t('emergency.primaryDoctor')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.primary_doctor} {emergencyInfo.primary_doctor_phone}</p></div>}
                   {emergencyInfo.insurance_provider && <div><p className="text-xs text-muted-foreground">{t('emergency.insuranceProvider')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.insurance_provider} {emergencyInfo.insurance_member_id}</p></div>}
-                  {emergencyInfo.emergency_contact_name && <div><p className="text-xs text-muted-foreground">{t('emergency.emergencyContactName')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.emergency_contact_name} {emergencyInfo.emergency_contact_phone}</p></div>}
+                  {emergencyContactList.length > 0 ? (
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('emergency.emergencyContacts')}</p>
+                      {emergencyContactList.map(c => (
+                        <p key={c.id} className="text-[#1A2B3C] font-medium">{c.name} {c.phone}</p>
+                      ))}
+                    </div>
+                  ) : emergencyInfo.emergency_contact_name && (
+                    <div><p className="text-xs text-muted-foreground">{t('emergency.emergencyContactName')}</p><p className="text-[#1A2B3C] font-medium">{emergencyInfo.emergency_contact_name} {emergencyInfo.emergency_contact_phone}</p></div>
+                  )}
+                  {poaContactList.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('emergency.powerOfAttorney')}</p>
+                      <p className="text-[#1A2B3C] font-medium">{poaContactList.map(c => c.name).join(', ')}{hasPoaDocumentOnFile ? ` · ${t('documents.categoryPoa')} ${t('documents.title').toLowerCase()}` : ''}</p>
+                    </div>
+                  )}
+                  {healthcareProxyContactList.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('emergency.healthcareProxy')}</p>
+                      <p className="text-[#1A2B3C] font-medium">{healthcareProxyContactList.map(c => c.name).join(', ')}</p>
+                    </div>
+                  )}
+                  {hasAdvanceDirectiveOnFile && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">{t('documents.categoryAdvanceDirective')}</p>
+                      <button onClick={() => setActiveTab('documents')} className="text-[#0D9488] font-medium hover:underline text-left">
+                        {t('emergency.advanceDirectiveOnFile')} · {t('emergency.viewInDocuments')}
+                      </button>
+                    </div>
+                  )}
                   {emergencyInfo.notes && <div className="col-span-2 sm:col-span-3"><p className="text-xs text-muted-foreground">{t('emergency.notes')}</p><p className="text-[#1A2B3C]">{emergencyInfo.notes}</p></div>}
                 </div>
               )}
+              <p className="text-xs text-muted-foreground mt-3">
+                {t('emergency.manageInContacts')}{' '}
+                <button onClick={() => setActiveTab('contacts')} className="text-[#0D9488] hover:underline font-medium">{t('emergency.goToContacts')}</button>
+              </p>
               <button onClick={notifyFamily} className="flex items-center justify-center gap-2 w-full mt-4 text-sm bg-[#DC2626] text-white px-4 py-2.5 rounded-lg hover:bg-red-700 font-semibold">
                 <Siren className="h-4 w-4" />{t('emergency.notifyFamily')}
               </button>
@@ -930,6 +988,9 @@ export default function DashboardPage() {
                                 <p className="text-sm font-medium text-[#1A2B3C]">{c.name}</p>
                                 <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{contactRoleLabel(c.role)}</span>
                                 {isIntlContact(c) && <span className="text-xs bg-teal-100 text-teal-800 rounded-full px-2 py-0.5">{t('contacts.international')}</span>}
+                                {c.is_emergency_contact && <span className="text-xs bg-red-100 text-red-800 rounded-full px-2 py-0.5">{t('contacts.emergencyContact')}</span>}
+                                {c.is_power_of_attorney && <span className="text-xs bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">{t('contacts.powerOfAttorney')}</span>}
+                                {c.is_healthcare_proxy && <span className="text-xs bg-purple-100 text-purple-800 rounded-full px-2 py-0.5">{t('contacts.healthcareProxy')}</span>}
                               </div>
                               {c.phone && <p className="text-xs text-muted-foreground font-mono mt-0.5">{c.phone}</p>}
                               {c.notes && <p className="text-xs text-muted-foreground mt-0.5">{c.notes}</p>}
@@ -1122,6 +1183,20 @@ export default function DashboardPage() {
           <Field label={t('contacts.notes')}>
             <textarea className={inputCls} rows={2} maxLength={280} value={contactForm.notes ?? ''} onChange={e => setContactForm(p => ({ ...p, notes: e.target.value }))} placeholder={t('contacts.notesPlaceholder')} />
           </Field>
+          <div className="space-y-2 border-t pt-3">
+            <label className="flex items-center gap-2 text-sm text-[#1A2B3C]">
+              <input type="checkbox" checked={!!contactForm.is_emergency_contact} onChange={e => setContactForm(p => ({ ...p, is_emergency_contact: e.target.checked }))} className="rounded" />
+              {t('contacts.markEmergencyContact')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-[#1A2B3C]">
+              <input type="checkbox" checked={!!contactForm.is_power_of_attorney} onChange={e => setContactForm(p => ({ ...p, is_power_of_attorney: e.target.checked }))} className="rounded" />
+              {t('contacts.markPowerOfAttorney')}
+            </label>
+            <label className="flex items-center gap-2 text-sm text-[#1A2B3C]">
+              <input type="checkbox" checked={!!contactForm.is_healthcare_proxy} onChange={e => setContactForm(p => ({ ...p, is_healthcare_proxy: e.target.checked }))} className="rounded" />
+              {t('contacts.markHealthcareProxy')}
+            </label>
+          </div>
           <SaveBtn saving={saving} onSave={saveContact} onCancel={() => setContactModal(null)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
       )}
@@ -1151,13 +1226,15 @@ export default function DashboardPage() {
               <input className={inputCls} value={emergencyForm.insurance_member_id ?? ''} onChange={e => setEmergencyForm(p => ({ ...p, insurance_member_id: e.target.value }))} />
             </Field>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label={t('emergency.emergencyContactName')}>
-              <input className={inputCls} value={emergencyForm.emergency_contact_name ?? ''} onChange={e => setEmergencyForm(p => ({ ...p, emergency_contact_name: e.target.value }))} />
-            </Field>
-            <Field label={t('emergency.emergencyContactPhone')}>
-              <input className={inputCls} value={emergencyForm.emergency_contact_phone ?? ''} onChange={e => setEmergencyForm(p => ({ ...p, emergency_contact_phone: e.target.value }))} />
-            </Field>
+          <div className="text-xs bg-teal-50 text-teal-800 rounded-lg px-3 py-2">
+            {t('emergency.manageInContacts')}{' '}
+            <button
+              type="button"
+              onClick={() => { setEmergencyModal(false); setActiveTab('contacts') }}
+              className="underline font-semibold"
+            >
+              {t('emergency.goToContacts')}
+            </button>
           </div>
           <Field label={t('emergency.notes')}>
             <textarea className={inputCls} rows={2} value={emergencyForm.notes ?? ''} onChange={e => setEmergencyForm(p => ({ ...p, notes: e.target.value }))} />
