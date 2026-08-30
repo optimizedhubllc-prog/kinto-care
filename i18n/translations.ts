@@ -227,6 +227,12 @@ export const translations = {
       routingDoWhatsapp: "This contact will receive WhatsApp as primary action + calling option",
       routingIntlWhatsapp: "This contact will receive WhatsApp + calling options",
       languagePreference: "Language Preference",
+      emergencyContact: "Emergency Contact",
+      powerOfAttorney: "Power of Attorney",
+      healthcareProxy: "Healthcare Proxy",
+      markEmergencyContact: "Designate as emergency contact",
+      markPowerOfAttorney: "Designate as Power of Attorney",
+      markHealthcareProxy: "Designate as Healthcare Proxy",
     },
 
     // Authentication
@@ -296,6 +302,13 @@ export const translations = {
       notifyFamily: "Notify Family",
       notifyMessage: "Medical emergency — calling for help now. Will update as soon as I can.",
       noFamilyContacts: "Add family members in Contacts with phone numbers first.",
+      emergencyContacts: "Emergency Contacts",
+      powerOfAttorney: "Power of Attorney",
+      healthcareProxy: "Healthcare Proxy",
+      advanceDirectiveOnFile: "Advance directive on file",
+      viewInDocuments: "View in Documents",
+      manageInContacts: "Manage emergency contacts, Power of Attorney, and Healthcare Proxy from the Contacts tab.",
+      goToContacts: "Go to Contacts",
     },
 
     // Care Calendar
@@ -559,6 +572,12 @@ export const translations = {
       routingDoWhatsapp: "Este contacto recibirá WhatsApp como acción principal + opción de llamada",
       routingIntlWhatsapp: "Este contacto recibirá WhatsApp + opciones de llamada",
       languagePreference: "Preferencia de Idioma",
+      emergencyContact: "Contacto de Emergencia",
+      powerOfAttorney: "Poder Notarial",
+      healthcareProxy: "Representante de Atención Médica",
+      markEmergencyContact: "Designar como contacto de emergencia",
+      markPowerOfAttorney: "Designar como Poder Notarial",
+      markHealthcareProxy: "Designar como Representante de Atención Médica",
     },
 
     // Authentication
@@ -628,6 +647,13 @@ export const translations = {
       notifyFamily: "Notificar a la Familia",
       notifyMessage: "Emergencia médica — pidiendo ayuda ahora. Actualizaré en cuanto pueda.",
       noFamilyContacts: "Agrega familiares en Contactos con números de teléfono primero.",
+      emergencyContacts: "Contactos de Emergencia",
+      powerOfAttorney: "Poder Notarial",
+      healthcareProxy: "Representante de Atención Médica",
+      advanceDirectiveOnFile: "Directiva anticipada en archivo",
+      viewInDocuments: "Ver en Documentos",
+      manageInContacts: "Administra contactos de emergencia, Poder Notarial y Representante de Atención Médica desde la pestaña Contactos.",
+      goToContacts: "Ir a Contactos",
     },
 
     // Calendario de Cuidado
