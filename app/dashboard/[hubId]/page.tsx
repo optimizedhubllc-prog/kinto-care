@@ -1,9 +1,9 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Users, Calendar, Pill, CheckSquare, LogOut, Plus, X, Clock, AlertTriangle, FileText, MessageCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Send, Share2, ExternalLink, Siren } from 'lucide-react'
+import { Users, Calendar, Pill, CheckSquare, LogOut, Plus, X, Clock, AlertTriangle, FileText, MessageCircle, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Send, Share2, ExternalLink, Siren, Camera, Upload, Paperclip } from 'lucide-react'
 import { KintoLogo } from '@/components/ui/KintoLogo'
 import { useTranslation } from '@/hooks/useTranslation'
 import { KintoScan } from '@/components/ui/KintoScan'
@@ -18,7 +18,7 @@ type EmergencyInfo = {
   primary_doctor_phone: string | null; insurance_provider: string | null; insurance_member_id: string | null
   emergency_contact_name: string | null; emergency_contact_phone: string | null; notes: string | null; updated_at?: string
 }
-type DocumentItem = { id: string; name: string; category: string; file_url: string | null; notes: string | null; created_at: string }
+type DocumentItem = { id: string; name: string; category: string; file_url: string | null; storage_path: string | null; notes: string | null; created_at: string }
 type TaskComment = { id: string; task_id: string; author_id: string | null; comment: string; created_at: string }
 type ContactItem = {
   id: string; name: string; role: string; phone: string; country_code: string; language_preference: string; notes: string | null
@@ -139,6 +139,14 @@ export default function DashboardPage() {
   const [contactModal, setContactModal] = useState<null | 'add' | ContactItem>(null)
   const [shiftModal, setShiftModal] = useState<null | 'add' | Shift>(null)
 
+  // Document upload (file/photo) + share
+  const [docFileName, setDocFileName] = useState<string | null>(null)
+  const [docUploading, setDocUploading] = useState(false)
+  const [docUploadError, setDocUploadError] = useState<string | null>(null)
+  const [docActionError, setDocActionError] = useState<string | null>(null)
+  const docFileInputRef = useRef<HTMLInputElement>(null)
+  const docCameraInputRef = useRef<HTMLInputElement>(null)
+
   // Calendar navigation
   const [calendarMonth, setCalendarMonth] = useState(() => { const d = new Date(); d.setDate(1); return d })
   const [selectedDay, setSelectedDay] = useState<Date | null>(null)
@@ -173,7 +181,7 @@ export default function DashboardPage() {
       supabase.from('tasks').select('id, title, description, due_date, status, priority, assigned_to').eq('hub_id', hubId).order('created_at', { ascending: false }),
       supabase.from('activity_log').select('id, action_type, entity_type, description, created_at, actor_id').eq('hub_id', hubId).order('created_at', { ascending: false }).limit(10),
       supabase.from('emergency_info').select('*').eq('hub_id', hubId).maybeSingle(),
-      supabase.from('documents').select('id, name, category, file_url, notes, created_at').eq('hub_id', hubId).order('created_at', { ascending: false }),
+      supabase.from('documents').select('id, name, category, file_url, storage_path, notes, created_at').eq('hub_id', hubId).order('created_at', { ascending: false }),
       supabase.from('contacts').select('id, name, role, phone, country_code, language_preference, notes, is_emergency_contact, is_power_of_attorney, is_healthcare_proxy').eq('hub_id', hubId).order('name', { ascending: true }),
       supabase.from('care_logistics').select('id, caregiver_id, start_time, end_time, task_notes').eq('hub_id', hubId).order('start_time', { ascending: true }),
     ])
@@ -300,19 +308,104 @@ export default function DashboardPage() {
   }
 
   // Documents
-  const openAddDoc = () => { setDocForm({ category: 'other' }); setDocModal(true) }
+  // Files live in the private 'hub-documents' storage bucket, one object per
+  // document, at {hub_id}/{uuid}.{ext}. The bucket is never public — access is
+  // always through a short-lived signed URL generated on demand (open or
+  // share), never a permanent link. A document can still just be an external
+  // link (file_url) instead of an uploaded file — both are supported.
+  const DOC_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+  const DOC_MAX_BYTES = 20 * 1024 * 1024 // 20MB, matches the storage bucket's file_size_limit
+
+  const openAddDoc = () => { setDocForm({ category: 'other' }); setDocFileName(null); setDocUploadError(null); setDocModal(true) }
+
+  const closeDocModal = async () => {
+    // If a file was uploaded but the modal is closed without saving, don't
+    // leave an orphaned object in storage.
+    if (docForm.storage_path) {
+      await supabase.storage.from('hub-documents').remove([docForm.storage_path]).catch(() => {})
+    }
+    setDocModal(false)
+    setDocForm({ category: 'other' })
+    setDocFileName(null)
+    setDocUploadError(null)
+  }
+
+  const handleDocFile = async (file: File) => {
+    setDocUploadError(null)
+    if (!DOC_ALLOWED_TYPES.includes(file.type)) { setDocUploadError(t('documents.uploadError')); return }
+    if (file.size > DOC_MAX_BYTES) { setDocUploadError(t('documents.fileSizeError')); return }
+
+    // Replace any previously uploaded-but-unsaved file for this modal session
+    if (docForm.storage_path) {
+      await supabase.storage.from('hub-documents').remove([docForm.storage_path]).catch(() => {})
+    }
+
+    setDocUploading(true)
+    try {
+      const ext = file.name.includes('.') ? file.name.split('.').pop() : 'dat'
+      const path = `${hubId}/${crypto.randomUUID()}.${ext}`
+      const { error: upErr } = await supabase.storage.from('hub-documents').upload(path, file, { contentType: file.type })
+      if (upErr) { setDocUploadError(upErr.message); setDocUploading(false); return }
+      setDocForm(p => ({ ...p, storage_path: path, name: p.name?.trim() ? p.name : file.name.replace(/\.[^/.]+$/, '') }))
+      setDocFileName(file.name)
+    } catch (e) {
+      setDocUploadError(e instanceof Error ? e.message : t('documents.uploadError'))
+    }
+    setDocUploading(false)
+  }
+
   const saveDoc = async () => {
+    if (docUploading) return
     setSaving(true)
     try {
       await supabase.from('documents').insert({ ...docForm, hub_id: hubId })
       setDocModal(false)
+      setDocForm({ category: 'other' })
+      setDocFileName(null)
       await loadData()
     } catch (e) { console.error(e) }
     setSaving(false)
   }
   const deleteDoc = async (id: string) => {
-    await supabase.from('documents').delete().eq('id', id)
+    const doc = documents.find(d => d.id === id)
+    const { error: delError } = await supabase.from('documents').delete().eq('id', id)
+    if (delError) { setDocActionError(delError.message); return }
+    if (doc?.storage_path) {
+      await supabase.storage.from('hub-documents').remove([doc.storage_path]).catch(() => {})
+    }
     await loadData()
+  }
+  // Open an uploaded file via a short-lived signed URL (1 hour); an external
+  // link (file_url) opens directly since it isn't ours to sign.
+  const openDocument = async (d: DocumentItem) => {
+    setDocActionError(null)
+    if (d.storage_path) {
+      const { data, error: signErr } = await supabase.storage.from('hub-documents').createSignedUrl(d.storage_path, 60 * 60)
+      if (signErr || !data?.signedUrl) { setDocActionError(t('documents.openError')); return }
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } else if (d.file_url) {
+      window.open(d.file_url, '_blank', 'noopener,noreferrer')
+    }
+  }
+  // Share a document with someone outside the hub (e.g. a doctor) via a
+  // signed link, using the same native-share/clipboard pattern as Emergency
+  // Info. The link works for 24 hours for anyone who has it — a deliberate
+  // tradeoff for convenience, same as sharing a Google Drive link.
+  const shareDocument = async (d: DocumentItem) => {
+    setDocActionError(null)
+    let url = d.file_url ?? null
+    if (d.storage_path) {
+      const { data, error: signErr } = await supabase.storage.from('hub-documents').createSignedUrl(d.storage_path, 60 * 60 * 24)
+      if (signErr || !data?.signedUrl) { setDocActionError(t('documents.shareError')); return }
+      url = data.signedUrl
+    }
+    if (!url) return
+    const title = `${patientName ? patientName + ' — ' : ''}${d.name}`
+    if (navigator.share) {
+      navigator.share({ title, url }).catch(() => {})
+    } else {
+      navigator.clipboard?.writeText(url)
+    }
   }
 
   // Contacts
@@ -923,6 +1016,12 @@ export default function DashboardPage() {
                 <Plus className="h-3 w-3" />{t('common.add')}
               </button>
             </div>
+            {docActionError && (
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mb-3">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                {docActionError}
+              </div>
+            )}
             {documents.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('documents.empty')}</p>
             ) : (
@@ -933,14 +1032,20 @@ export default function DashboardPage() {
                       <p className="text-sm font-medium text-[#1A2B3C]">{d.name}</p>
                       <div className="flex gap-2 items-center mt-0.5">
                         <span className="text-xs bg-[#FDF8F2] border rounded-full px-2 py-0.5 text-[#1A2B3C]">{docCategoryLabel(d.category)}</span>
+                        {d.storage_path && <span className="text-xs text-muted-foreground flex items-center gap-1"><Paperclip className="h-3 w-3" />{t('documents.uploaded')}</span>}
                         {d.notes && <p className="text-xs text-muted-foreground">{d.notes}</p>}
                       </div>
                     </div>
                     <div className="flex items-center gap-3 ml-4 shrink-0">
-                      {d.file_url && (
-                        <a href={d.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
+                      {(d.storage_path || d.file_url) && (
+                        <button onClick={() => openDocument(d)} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
                           <ExternalLink className="h-3 w-3" />{t('documents.openLink')}
-                        </a>
+                        </button>
+                      )}
+                      {(d.storage_path || d.file_url) && (
+                        <button onClick={() => shareDocument(d)} className="flex items-center gap-1 text-xs text-[#0D9488] hover:underline">
+                          <Share2 className="h-3 w-3" />{t('documents.share')}
+                        </button>
                       )}
                       <button onClick={() => deleteDoc(d.id)} className="text-xs text-[#DC2626] hover:underline">{t('common.delete')}</button>
                     </div>
@@ -1245,7 +1350,52 @@ export default function DashboardPage() {
 
       {/* Add Document Modal */}
       {docModal && (
-        <Modal title={t('documents.addDocument')} onClose={() => setDocModal(false)}>
+        <Modal title={t('documents.addDocument')} onClose={closeDocModal}>
+          <Field label={t('documents.attachFile')}>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => docCameraInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 bg-[#DC2626] text-white rounded-lg hover:bg-red-700 text-sm font-semibold"
+              >
+                <Camera className="h-4 w-4" />{t('documents.takePhoto')}
+              </button>
+              <button
+                type="button"
+                onClick={() => docFileInputRef.current?.click()}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 border border-[#0D9488] text-[#0D9488] rounded-lg hover:bg-teal-50 text-sm font-semibold"
+              >
+                <Upload className="h-4 w-4" />{t('documents.chooseFile')}
+              </button>
+            </div>
+            <input
+              ref={docCameraInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              className="hidden"
+              onChange={e => e.target.files?.[0] && handleDocFile(e.target.files[0])}
+            />
+            <input
+              ref={docFileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              className="hidden"
+              onChange={e => e.target.files?.[0] && handleDocFile(e.target.files[0])}
+            />
+            {docUploading && <p className="text-xs text-[#0D9488] mt-2">{t('common.saving')}</p>}
+            {docFileName && !docUploading && (
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <Paperclip className="h-3 w-3" />{docFileName}
+              </p>
+            )}
+            {docUploadError && (
+              <div className="flex items-center gap-2 text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2 mt-2">
+                <AlertTriangle className="h-3 w-3 shrink-0" />
+                {docUploadError}
+              </div>
+            )}
+          </Field>
           <Field label={t('documents.name')}>
             <input className={inputCls} value={docForm.name ?? ''} onChange={e => setDocForm(p => ({ ...p, name: e.target.value }))} placeholder="Health Insurance Card" />
           </Field>
@@ -1258,13 +1408,13 @@ export default function DashboardPage() {
               <option value="other">{t('documents.categoryOther')}</option>
             </select>
           </Field>
-          <Field label={t('documents.link')}>
+          <Field label={t('documents.linkAlt')}>
             <input className={inputCls} value={docForm.file_url ?? ''} onChange={e => setDocForm(p => ({ ...p, file_url: e.target.value }))} placeholder="https://…" />
           </Field>
           <Field label={t('documents.notes')}>
             <textarea className={inputCls} rows={2} value={docForm.notes ?? ''} onChange={e => setDocForm(p => ({ ...p, notes: e.target.value }))} />
           </Field>
-          <SaveBtn saving={saving} onSave={saveDoc} onCancel={() => setDocModal(false)} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
+          <SaveBtn saving={saving || docUploading} onSave={saveDoc} onCancel={closeDocModal} saveLabel={t('common.save')} cancelLabel={t('common.cancel')} />
         </Modal>
       )}
 
