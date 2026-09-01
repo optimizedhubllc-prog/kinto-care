@@ -4,6 +4,22 @@ import { NextResponse, type NextRequest } from "next/server";
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // Skip auth refresh on prefetch requests. Next.js Link prefetching (and,
+  // on the iOS PWA, background revalidation) fires GET requests to multiple
+  // routes at once, each hitting this middleware with the SAME refresh-token
+  // cookie. Supabase rotates the token on every use, so the first request
+  // wins and the second gets "Invalid Refresh Token: Already Used" — which
+  // we then (correctly) treat as logged-out and wipe the session. Skipping
+  // prefetch requests here stops the race at the source instead of reacting
+  // to it after the fact.
+  const isPrefetch =
+    request.headers.get("next-router-prefetch") === "1" ||
+    request.headers.get("purpose") === "prefetch";
+
+  if (isPrefetch) {
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -36,7 +52,9 @@ export async function middleware(request: NextRequest) {
       error.message?.includes("Refresh Token") ||
       error.code === "refresh_token_already_used";
 
-    if (isStaleRefreshToken) {
+    const isNoSession = error.message?.includes("Auth session missing");
+
+    if (isStaleRefreshToken || isNoSession) {
       request.cookies.getAll().forEach(({ name }) => {
         if (name.startsWith("sb-")) supabaseResponse.cookies.delete(name);
       });
